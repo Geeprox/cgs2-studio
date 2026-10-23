@@ -21,7 +21,7 @@
 ```sh
 ./tools/check.sh
 python3 tools/check_release.py
-python3 -m pip install 'numpy>=2,<3'
+python3 -m pip install -r integrations/voice/requirements-test.txt
 python3 -m unittest discover -s integrations/voice -p 'test_*.py'
 cd integrations/media && npm ci && npm test
 ```

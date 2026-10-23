@@ -42,7 +42,7 @@ python3 tools/configure.py voice --private .local/voice-private
 协议、流式状态与尾段测试可在不运行模型、不接麦克风时执行：
 
 ```sh
-python3 -m pip install 'numpy>=2,<3'
+python3 -m pip install -r integrations/voice/requirements-test.txt
 python3 -m unittest discover -s integrations/voice -p 'test_*.py'
 ```
 

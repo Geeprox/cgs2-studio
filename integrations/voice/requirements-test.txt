@@ -1,0 +1,2 @@
+numpy>=2,<3
+opencc-python-reimplemented==0.1.7
