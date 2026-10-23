@@ -12,8 +12,10 @@ class WorkerTest(unittest.TestCase):
 import sys,json,pathlib,urllib.parse,os,time
 root=pathlib.Path(os.environ['FIXTURE']);args=sys.argv[1:];dest=pathlib.Path(args[args.index('--output')+1]);u=urllib.parse.urlparse(args[-1])
 if u.path=='/api/media/manifest':
- page=urllib.parse.parse_qs(u.query)['offset'][0];dest.write_text((root/('page-'+page+'.json')).read_text())
-else:dest.write_bytes(b'synthetic-jpeg')
+ page=urllib.parse.parse_qs(u.query)['offset'][0];raw=(root/('page-'+page+'.json')).read_text();dest.write_text(raw);(root/'authorized.json').write_text(json.dumps([x['id'] for x in json.loads(raw)['items']]))
+else:
+ if u.path.split('/')[-2] not in json.loads((root/'authorized.json').read_text()):sys.exit(1)
+ dest.write_bytes(b'synthetic-jpeg')
 '''
   (self.bin/'curl').write_text(curl);(self.bin/'curl').chmod(0o755)
   s=(ROOT/'device/media-client.sh').read_text().replace('/tmp/cgs2-media',str(self.run)).replace('/userdata/cgs2-media',str(self.conf)).replace('/userdata/cgs2-micro',str(self.conf)).replace('/userdata/cgs2-ui/cache/media',str(self.root/'video')).replace('/proc/uptime',str(self.root/'uptime'))
@@ -56,7 +58,17 @@ else:dest.write_bytes(b'synthetic-jpeg')
   v=self.request('photo',next_ready=True);self.assertEqual(v['offset'],0);self.assertEqual(v['nextPage'],48);self.assertTrue(Path(v['nextPreview'][7:]).exists())
   v=self.request('photo',page=v['nextPage'],index=v['nextIndex'],next_ready=True);self.assertEqual(v['items'][v['current']]['id'],'3');self.assertEqual(v['nextPage'],0)
   v=self.request('video');self.assertEqual(v['offset'],48);self.assertEqual([i['id'] for i in v['items']],['4'])
+  (self.run/'cache'/('a'*24+'-4.jpg')).unlink(missing_ok=True)
   v=self.request('video',page=24,index=23);self.assertEqual(v['offset'],48);self.assertFalse(v['hasPrevious'])
+ def test_manual_navigation_restores_photos_page_scope_after_cross_page_warmup(self):
+  self.page(0,[(i,'photo') for i in range(1,7)],True);self.page(24,[(7,'photo')]);self.start()
+  v=self.request('photo',next_ready=True)
+  for _ in range(5):v=self.request('photo',index=v['nextIndex'],next_ready=True)
+  self.assertEqual(v['nextPage'],24)
+  target=(v['current']+1)%6;photo_id=v['items'][target]['id']
+  cached=self.run/'cache'/('a'*24+'-'+photo_id+'.jpg');cached.unlink(missing_ok=True)
+  v=self.request('photo',index=target,next_ready=True)
+  self.assertEqual(v['items'][v['current']]['id'],photo_id);self.assertTrue(cached.exists());self.assertEqual(v['error'],'')
  def test_no_matching_media_is_empty_not_wrong_kind(self):
   self.page(0,[(1,'photo')]);self.start();v=self.request('audio');self.assertEqual(v['items'],[])
 if __name__=='__main__':unittest.main()

@@ -33,6 +33,7 @@ valid_id(){ printf '%s' "$1" | LC_ALL=C grep -Eq '^[A-Za-z0-9_-]{1,80}$'; }
 last_request=$(jq -r '.id//empty' "$RUN/request.json" 2>/dev/null || true)
 last_poll=-60
 offset=0
+source_page=-1
 media_kind=all
 seen='[]'
 next_index=-1
@@ -105,6 +106,7 @@ load(){
  if ! jq --arg kind "$media_kind" '{enabled:(.enabled==true),revision:(.revision//""),albumName:(.albumName//"相册与视频"),intervalMs:((.intervalMs//10000)|if .<3000 then 3000 elif .>60000 then 60000 else . end),offset:(.offset//0),hasMore:(.hasMore==true),items:(.items|map(select((.id|type)=="string" and (.id|length)>0 and (.id|length)<=12 and (.id|explode|all(.[];.>=48 and .<=57)) and (.kind=="photo" or .kind=="video" or .kind=="audio") and ($kind=="all" or .kind==$kind)))|.[0:24])}' "$RUN/remote.next" > "$RUN/remote.clean";then
   error='相册数据暂不可用';status;return 1
  fi
+ source_page=$offset
  next=$(jq -r '.revision' "$RUN/remote.clean")
  case "$next" in *[!a-f0-9]*|'') next='';;esac
  enabled=$(jq -r '.enabled' "$RUN/remote.clean")
@@ -132,6 +134,13 @@ prune(){
  ls -t "$RUN/cache/"*.jpg 2>/dev/null | tail -n +5 | while IFS= read -r old;do rm -f "$old";done
 }
 fetch_selected(){
+ # Photos authorizes only the last listed page. A sparse backward search may
+ # restore the previous view; re-authorize it before an evicted preview is read.
+ if [ "$source_page" -ne "$offset" ];then
+  get "/api/media/manifest?offset=$offset" "$RUN/authorize.json" 65536 15 || return
+  if [ "$(jq -r '.revision' "$RUN/authorize.json")" != "$revision" ];then error='媒体选择已更新，请重试';status;return 1;fi
+  source_page=$offset
+ fi
  count=$(jq '.items|length' "$RUN/remote.json")
  if [ "$selected" -ge "$count" ];then selected=$((count>0?count-1:0));fi
  [ -n "$revision" ] || return 0
@@ -187,6 +196,7 @@ warm_page(){
  warm=$next_page;steps=0
  while [ "$steps" -lt 208 ];do
   get "/api/media/manifest?offset=$warm" "$RUN/warm.json" 65536 15 || return
+  source_page=$warm
   [ "$(jq -r '.revision' "$RUN/warm.json")" = "$revision" ] || return
   jq '.items=[.items[]|select(.kind=="photo" and (.id|type)=="string" and (.id|test("^[0-9]{1,12}$")))]' "$RUN/warm.json" > "$RUN/warm.clean"
   count=$(jq '.items|length' "$RUN/warm.clean")
@@ -249,7 +259,7 @@ while :;do
     selected=$index;error='';next_index=-1;next_id=''
     old_offset=$offset
     cp "$RUN/remote.json" "$RUN/previous.json" 2>/dev/null || true
-    if [ "$kind_changed" = true ] || [ "$offset" -ne "$page" ] || [ ! -s "$RUN/remote.json" ] || [ $((now-last_poll)) -ge 30 ];then
+    if [ "$kind_changed" = true ] || [ "$source_page" -ne "$page" ] || [ "$offset" -ne "$page" ] || [ ! -s "$RUN/remote.json" ] || [ $((now-last_poll)) -ge 30 ];then
      offset=$page
      if [ "$old_offset" -ne "$offset" ];then seen='[]';fi
      load || { sleep 0.25;continue; }
