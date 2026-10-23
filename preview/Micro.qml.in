@@ -1,0 +1,11 @@
+import QtQuick 2.14
+Item{
+ id:root;width:720;height:720
+ QtObject{
+  id:demo;property bool online:true;property bool displayAwake:true;property string pending:'';property string feedback:'';property int uptime:1000
+  property var micro:({capabilities:{reasoning:true},keyAvailable:{agent0:true,agent1:true,agent2:true,agent3:true,agent4:true,agent5:true,fast:true,approve:true,reject:true,fork:true,submit:true,up:true,down:true,left:true,right:true},layout:{},slots:[{status:'running',title:'Example task A'},{status:'waiting',title:'Example task B'},{status:'complete',title:'Example task C'},{status:'idle',title:''},{status:'error',title:'Example task D'},{status:'idle',title:''}]})
+  function poll(){} function command(a,b){}
+ }
+ MicroPanel{id:panel;anchors.fill:parent;store:demo}
+ Timer{interval:600;running:true;onTriggered:panel.grabToImage(function(r){console.info('CGS2_PREVIEW_SAVED '+r.saveToFile('@REMOTE@/screens/micro.png'));Qt.quit()})}
+}

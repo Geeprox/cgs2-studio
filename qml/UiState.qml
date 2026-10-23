@@ -48,7 +48,7 @@ Item {
   if(displayAwake&&parent&&!parent.visible)return
   // Coalesce rapid native brightness ramps into at most one tmpfs write/second.
   if(uptime===screenStateLastUptime)return
-  var panel=['','menu','skins','micro','media','display','screen','night','night-screen','connection','weather-demo'].indexOf(activePanel)>=0?activePanel:'other'
+  var panel=['','menu','skins','micro','media','video','music','display','screen','night','night-screen','connection','weather-demo'].indexOf(activePanel)>=0?activePanel:'other'
   var snapshot={version:1,nativeScreenAvailable:nativeScreenAvailable,nightTimerAvailable:nightTimer!==null,displayAwake:displayAwake,nightEnabled:nightEnabled,nightStartMinutes:nightStartMinutes,nightEndMinutes:nightEndMinutes,nightWindowActive:nightWindowActive,isAutoBrightness:nativeAutomaticBrightness,brightnessValue:nativeBrightnessValue,idleDimTimeoutSeconds:idleDimTimeoutSeconds,idleDimRequested:idleDimRequested,skin:skin,microActive:microActive,mediaActive:mediaActive,activePanel:panel}
   var fingerprint=JSON.stringify(snapshot)
   if(fingerprint===screenStateLast&&uptime>=screenStateLastUptime&&uptime-screenStateLastUptime<10)return

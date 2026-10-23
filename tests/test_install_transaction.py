@@ -50,6 +50,10 @@ case "$1:$2" in -TERM:4242|-TERM:4243)
  rm -f "$FIXTURE_ROOT/tmp/running";;esac
 exit 0''')
   self.stub('setsid','''case "$1" in */QingSnow2App)
+ for key in QT_QPA_EGLFS_WIDTH QT_QPA_EGLFS_HEIGHT QT_QPA_EGLFS_PHYSICAL_WIDTH QT_QPA_EGLFS_PHYSICAL_HEIGHT;do
+  eval "value=\${$key:-missing}"
+  printf '%s=%s\n' "$key" "$value" >> "$FIXTURE_ROOT/tmp/display-env"
+ done
  [ "${FAIL_LAUNCH:-0}" = 0 ] || exit 0
  mkdir -p "$FIXTURE_ROOT/proc/4243"
  echo 'State: S (sleeping)' > "$FIXTURE_ROOT/proc/4243/status"
@@ -74,6 +78,7 @@ exit 0''')
   return subprocess.run(['/bin/sh',str(script),ID],env={**self.env,**env},capture_output=True,text=True,timeout=10)
  def test_success_and_guarded_rollback_preserve_preferences(self):
   result=self.run_script('install-ui.sh');self.assertEqual(result.returncode,0,result.stderr);self.assertIn('CGS2_INSTALL_OK',result.stdout)
+  self.assertEqual((self.base/'tmp/display-env').read_text().splitlines(),[key+'=720' for key in ['QT_QPA_EGLFS_WIDTH','QT_QPA_EGLFS_HEIGHT','QT_QPA_EGLFS_PHYSICAL_WIDTH','QT_QPA_EGLFS_PHYSICAL_HEIGHT']])
   self.assertEqual(self.app.read_bytes(),self.candidate);self.assertTrue((self.base/'userdata/cgs2-ui/qml/new.qml').exists())
   self.assertEqual((self.base/'userdata/cgs2-ui/preferences.json').read_text(),'private preferences fixture')
   # A later QML edit must block rollback before any process is stopped.

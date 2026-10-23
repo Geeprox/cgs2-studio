@@ -93,7 +93,7 @@ for name in recovery-agent.sh history-export.sh;do cp "$PAYLOAD/$name" "$UI/$nam
 cp "$PAYLOAD/S98cgs2-ui" /etc/init.d/S98cgs2-ui.studio-new;chmod 755 /etc/init.d/S98cgs2-ui.studio-new;mv /etc/init.d/S98cgs2-ui.studio-new /etc/init.d/S98cgs2-ui
 # Start exactly one EGLFS application with the vendor platform/font settings.
 sync;echo 3 > /proc/sys/vm/drop_caches
-(cd /qingping/bin;QT_QPA_PLATFORM=eglfs QT_QPA_FONTDIR=/usr/share/fonts QT_QPA_EGLFS_ALWAYS_SET_MODE=1 QT_QPA_EGLFS_KMS_ATOMIC=1 QT_GSTREAMER_PLAYBIN=playbin QT_GSTREAMER_WIDGET_VIDEOSINK= QT_GSTREAMER_WINDOW_VIDEOSINK= /usr/bin/setsid "$APP" -platform eglfs </dev/null >/dev/console 2>&1 9>&- &)
+(cd /qingping/bin;QT_QPA_PLATFORM=eglfs QT_QPA_FONTDIR=/usr/share/fonts QT_QPA_EGLFS_ALWAYS_SET_MODE=1 QT_QPA_EGLFS_KMS_ATOMIC=1 QT_QPA_EGLFS_WIDTH=720 QT_QPA_EGLFS_HEIGHT=720 QT_QPA_EGLFS_PHYSICAL_WIDTH=720 QT_QPA_EGLFS_PHYSICAL_HEIGHT=720 QT_GSTREAMER_PLAYBIN=playbin QT_GSTREAMER_WIDGET_VIDEOSINK= QT_GSTREAMER_WINDOW_VIDEOSINK= /usr/bin/setsid "$APP" -platform eglfs </dev/null >/dev/console 2>&1 9>&- &)
 /etc/init.d/S98cgs2-ui start
 sleep 8
 NEW=$(pidof QingSnow2App)

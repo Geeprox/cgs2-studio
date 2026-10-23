@@ -3,6 +3,8 @@ import QtMultimedia 5.12
 import 'MediaLogic.js' as Logic
 Rectangle {
  id:p;objectName:'media-panel';color:'#070c0c';property var store;property color accent:'#d3ad7a';signal closed()
+ property string mediaKind:'photo'
+ readonly property string pageTitle:mediaKind==='video'?'视频播放':mediaKind==='audio'?'音乐播放':'相册'
  property var media:({enabled:false,items:[]})
  property int current:0
  property bool slideshow:false
@@ -37,7 +39,7 @@ Rectangle {
   if(!active||!store||store.uptime<=0)return false;
   requestId='media-'+Date.now()+'-'+(++requestNumber);requestAt=store.uptime;
   presence(true);
-  return store.write('file:///tmp/cgs2-media/request.json',{protocol:2,id:requestId,uptime:store.uptime,index:index===undefined?current:index,video:video===true,force:force===true,page:page===undefined?(media.offset||0):page})
+  return store.write('file:///tmp/cgs2-media/request.json',{protocol:2,kind:mediaKind,id:requestId,uptime:store.uptime,index:index===undefined?current:index,video:video===true,force:force===true,page:page===undefined?(media.offset||0):page})
  }
  function go(direction,automatic){
   if(!active||navigating||videoPending)return;
@@ -61,7 +63,7 @@ Rectangle {
   if(Logic.readyVideo(media,selected))startPreparedVideo();else request(true);
  }
  function accept(v){
-  if(!active||!Logic.accept(v,requestId,lastStamp))return;
+  if(!active||v.mediaKind!==mediaKind||!Logic.accept(v,requestId,lastStamp))return;
   lastStamp=Number(v.stateUptimeMs);
   var previousId=selected?String(selected.id):'',previousRevision=media.revision;
   media=v;current=Math.max(0,Math.min(Number(v.current)||0,v.items.length-1));
@@ -69,7 +71,7 @@ Rectangle {
   if(previousId&&selected&&previousId!==String(selected.id)){clearVideo();feedbackText=''}
   if(Logic.readyPhoto(selected))photoSource=String(selected.preview);
   if(v.error){feedbackText=String(v.error);requestId='';videoPending=false;slideshow=false;controls=true}
-  else if(v.busy!==true&&selected&&selected.previewReady===true)requestId='';
+  else if(v.busy!==true&&(!selected||selected.previewReady===true))requestId='';
   if(videoPending){if(v.busy!==true&&Logic.readyVideo(v,selected)){requestId='';startPreparedVideo()}}
   syncSlide(false)
  }
@@ -101,8 +103,8 @@ Rectangle {
  Item{anchors.fill:parent;visible:p.videoShowing&&p.selected&&p.selected.kind==='audio';FaceText{x:80;y:285;width:560;height:60;text:'♫';font.pixelSize:48;color:'#d3ad7a';horizontalAlignment:Text.AlignHCenter}FaceText{x:70;y:370;width:580;height:90;text:p.selected?p.selected.title||'NAS 音乐':'';font.pixelSize:27;horizontalAlignment:Text.AlignHCenter;elide:Text.ElideMiddle}}
  MouseArea{anchors.fill:parent;onClicked:p.controls=!p.controls}
  Rectangle{anchors.fill:parent;color:'#070c0c';visible:!p.media.enabled||!p.selected
-  FaceText{x:70;y:220;width:580;height:100;text:'照片、视频与音乐';font.pixelSize:38;horizontalAlignment:Text.AlignHCenter}
-  FaceText{x:90;y:330;width:540;height:120;text:p.feedbackText||p.media.error||'在 Friday 青萍设置中\n选择照片文件夹、视频或音乐';font.pixelSize:23;color:'#a6b6ae';wrapMode:Text.WordWrap;horizontalAlignment:Text.AlignHCenter}
+  FaceText{x:70;y:220;width:580;height:100;text:p.pageTitle;font.pixelSize:38;horizontalAlignment:Text.AlignHCenter}
+  FaceText{x:90;y:330;width:540;height:120;text:p.feedbackText||p.media.error||(p.mediaKind==='photo'?'在青萍设置页面选择照片文件夹':p.mediaKind==='video'?'在青萍设置页面单独选择视频':'在青萍设置页面单独选择音乐');font.pixelSize:23;color:'#a6b6ae';wrapMode:Text.WordWrap;horizontalAlignment:Text.AlignHCenter}
  }
  Rectangle{x:140;y:310;width:440;height:84;radius:22;color:'#d909100e';visible:!!p.selected&&p.videoPending
   FaceText{anchors.fill:parent;text:'正在准备视频…';font.pixelSize:27;horizontalAlignment:Text.AlignHCenter}
@@ -110,13 +112,13 @@ Rectangle {
  Item{anchors.fill:parent;visible:p.controls
   Rectangle{x:0;y:0;width:720;height:105;color:'#d909100e'}
   Action{x:22;y:28;width:70;height:58;label:'‹';onClicked:p.closed()}
-  FaceText{x:110;y:36;width:480;height:45;text:p.media.albumName||'相册与视频';font.pixelSize:26;elide:Text.ElideRight}
-  Action{x:612;y:28;width:86;height:58;label:p.fillPhotos?'完整':'铺满';visible:!!p.selected&&!p.videoShowing;onClicked:p.fillPhotos=!p.fillPhotos}
+  FaceText{x:110;y:36;width:480;height:45;text:p.pageTitle+(p.media.albumName?' · '+p.media.albumName:'');font.pixelSize:26;elide:Text.ElideRight}
+  Action{x:612;y:28;width:86;height:58;label:p.fillPhotos?'完整':'铺满';visible:p.mediaKind==='photo'&&!!p.selected&&!p.videoShowing;onClicked:p.fillPhotos=!p.fillPhotos}
   Rectangle{x:0;y:600;width:720;height:120;color:'#e009100e'}
-  Action{x:45;y:627;width:130;height:60;label:'‹ 上一张';enabled:!p.navigating&&!p.videoPending&&Logic.target(p.media,p.current,-1,false)!==null;onClicked:p.go(-1,false)}
-  Action{x:195;y:627;width:150;height:60;label:p.slideshow?'暂停轮播':'开始轮播';enabled:!!p.selected&&!p.videoShowing&&!p.videoPending;onClicked:p.slideshow=!p.slideshow}
-  Action{x:365;y:627;width:140;height:60;label:p.videoPending?'取消准备':p.selected&&(p.selected.kind==='video'||p.selected.kind==='audio')?(player.playbackState===MediaPlayer.PlayingState?'暂停':p.selected.kind==='audio'?'播放音乐':'播放视频'):'照片';enabled:!!p.selected&&(p.selected.kind==='video'||p.selected.kind==='audio')&&!p.navigating;onClicked:p.toggleVideo()}
-  Action{x:530;y:627;width:145;height:60;label:'下一张 ›';enabled:!p.navigating&&!p.videoPending&&Logic.target(p.media,p.current,1,false)!==null;onClicked:p.go(1,false)}
+  Action{x:45;y:627;width:150;height:60;label:p.mediaKind==='photo'?'‹ 上一张':'‹ 上一个';enabled:!p.navigating&&!p.videoPending&&Logic.target(p.media,p.current,-1,false)!==null;onClicked:p.go(-1,false)}
+  Action{x:220;y:627;width:280;height:60;visible:p.mediaKind==='photo';label:p.slideshow?'暂停轮播':'随机轮播';enabled:!!p.selected&&!p.videoShowing&&!p.videoPending;onClicked:p.slideshow=!p.slideshow}
+  Action{x:220;y:627;width:280;height:60;visible:p.mediaKind!=='photo';label:p.videoPending?'取消准备':p.selected&&(p.selected.kind==='video'||p.selected.kind==='audio')?(player.playbackState===MediaPlayer.PlayingState?'暂停':p.selected.kind==='audio'?'播放音乐':'播放视频'):'照片';enabled:!!p.selected&&(p.selected.kind==='video'||p.selected.kind==='audio')&&!p.navigating;onClicked:p.toggleVideo()}
+  Action{x:530;y:627;width:145;height:60;label:p.mediaKind==='photo'?'下一张 ›':'下一个 ›';enabled:!p.navigating&&!p.videoPending&&Logic.target(p.media,p.current,1,false)!==null;onClicked:p.go(1,false)}
   FaceText{x:72;y:551;width:p.feedbackText!==''?430:576;height:40;text:p.feedbackText||(photo.failed?'照片未能显示':((p.media.offset||0)+p.current+1)+' · '+(p.selected&&p.selected.kind==='video'?'视频':p.selected&&p.selected.kind==='audio'?'音乐':'照片'));font.pixelSize:20;color:'#e5eee7';horizontalAlignment:Text.AlignHCenter;elide:Text.ElideRight}
   Action{x:540;y:545;width:128;height:46;label:'重试';visible:p.feedbackText!==''||photo.failed;onClicked:p.selected&&(p.selected.kind==='video'||p.selected.kind==='audio')?p.toggleVideo():p.retry()}
  }

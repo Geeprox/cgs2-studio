@@ -29,7 +29,7 @@ Rectangle {
  function history(){var paths={airPM25:'PM25/PM25',airPM10:'PM10/PM10',airCO2:'CO2/CO2',airTEMP:'TEMP/TEMP',airHUMI:'HUMI/HUMI',airTVOC:'TVOC/TVOC',airNoise:'Noise/Noise'};openRequested('qrc:/History/'+paths[primaryKey]+'HistoryPage.qml')}
  Timer{interval:1000;running:d.displayActive;repeat:true;onTriggered:d.clock=new Date()}
 
- function syncPresence(){if(store){store.microActive=panel==='micro'&&displayActive;store.mediaActive=panel==='media'&&displayActive;store.activePanel=panel}}
+ function syncPresence(){if(store){store.microActive=panel==='micro'&&displayActive;store.mediaActive=['media','video','music'].indexOf(panel)>=0&&displayActive;store.activePanel=panel}}
  onPanelChanged:syncPresence()
  onDisplayActiveChanged:syncPresence()
  Component.onDestruction:if(store){store.microActive=false;store.mediaActive=false;store.activePanel=''}
@@ -82,11 +82,11 @@ Rectangle {
  }
  Rectangle{visible:d.panel==='menu';anchors.fill:parent;color:'#10170e';z:10
   FaceText{x:60;y:48;width:600;height:50;text:'青萍';font.pixelSize:32}
-  Repeater{model:['切换表盘','Codex Micro','相册与视频','天气背景','表盘动效','恢复布局','显示与连接','天气演示','返回表盘']
-   MenuCard{x:60+index%3*206;y:122+Math.floor(index/3)*170;width:188;height:152;kind:index;label:modelData;status:index===3?(d.store.edgeWeather?'已开启':'已关闭'):index===4?(d.store.faceMotion?'已开启':'已关闭'):'';onClicked:{if(index===0)d.panel='skins';if(index===1)d.panel='micro';if(index===2)d.panel='media';if(index===3)d.store.toggleWeather();if(index===4)d.store.toggleFaceMotion();if(index===5&&d.store.resetFaceLayout)d.store.resetFaceLayout(d.skin);if(index===6)d.panel='night-screen';if(index===7)d.panel='weather-demo';if(index===8)d.panel=''}}
+  Repeater{model:['切换表盘','Codex Micro','相册','视频播放','音乐播放','恢复布局','显示与连接','天气演示','返回表盘']
+   MenuCard{x:60+index%3*206;y:122+Math.floor(index/3)*170;width:188;height:152;kind:index;label:modelData;status:'';onClicked:{if(index===0)d.panel='skins';if(index===1)d.panel='micro';if(index===2)d.panel='media';if(index===3)d.panel='video';if(index===4)d.panel='music';if(index===5&&d.store.resetFaceLayout)d.store.resetFaceLayout(d.skin);if(index===6)d.panel='night-screen';if(index===7)d.panel='weather-demo';if(index===8)d.panel=''}}
   }
  }
- Loader{id:overlay;anchors.fill:parent;z:11;active:d.panel!==''&&d.panel!=='menu';source:d.panel==='skins'?'SkinPicker.qml':d.panel==='micro'?'MicroPanel.qml':d.panel==='media'?'MediaPanel.qml':d.panel==='weather-demo'?'WeatherDemo.qml':d.panel==='night-screen'?'NightScreenPanel.qml':'ConnectionPanel.qml';onLoaded:{item.store=d.store;item.accent=d.accent;if(item.objectName==='weather-demo')item.owner=d}
+ Loader{id:overlay;anchors.fill:parent;z:11;active:d.panel!==''&&d.panel!=='menu';source:d.panel==='skins'?'SkinPicker.qml':d.panel==='micro'?'MicroPanel.qml':['media','video','music'].indexOf(d.panel)>=0?'MediaPanel.qml':d.panel==='weather-demo'?'WeatherDemo.qml':d.panel==='night-screen'?'NightScreenPanel.qml':'ConnectionPanel.qml';onLoaded:{if(item.objectName==='media-panel')item.mediaKind=d.panel==='video'?'video':d.panel==='music'?'audio':'photo';item.store=d.store;item.accent=d.accent;if(item.objectName==='weather-demo')item.owner=d}
   Connections{target:overlay.item;ignoreUnknownSignals:true;function onClosed(){d.panel=''}function onConnectionRequested(){d.panel='connection'}function onOpenRequested(url){d.openRequested(url)}}
  }
  }

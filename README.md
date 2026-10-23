@@ -4,7 +4,7 @@
 
 **支持：CGS2 / Linux 4.19.232 aarch64 / 固件 4.5.6_0167。** 这是社区改造项目，使用设备现有的原生传感器和 Qt 环境。其他型号、固件、内核不在支持范围内。
 
-[安装与恢复](docs/INSTALL.md) · [表盘与交互](docs/FACES.md) · [NAS 相册、视频和音乐](docs/MEDIA.md) · [声笺语音转文字](docs/VOICE.md) · [验证范围](docs/VALIDATION.md)
+[安装与恢复](docs/INSTALL.md) · [表盘与交互](docs/FACES.md) · [NAS 相册、视频和音乐](docs/MEDIA.md) · [Codex Micro](docs/MICRO.md) · [声笺语音转文字](docs/VOICE.md) · [验证范围](docs/VALIDATION.md)
 
 <table>
 <tr><td><img src="docs/previews/face-0.png" width="180" alt="Ultra Modular"><br>Ultra Modular</td><td><img src="docs/previews/face-1.png" width="180" alt="Air Wayfinder"><br>Air Wayfinder</td><td><img src="docs/previews/face-2.png" width="180" alt="Infograph"><br>Infograph</td><td><img src="docs/previews/face-3.png" width="180" alt="双模块"><br>双模块</td></tr>
@@ -21,11 +21,17 @@
 - 透视参数按不同朝向、尺寸和线宽排列；拖动视角跟随手指。泳圈随波摆动，拖放保留目标位置，覆盖的参数会避让。
 - 12 类天气演示；按主题统一秒数显示；真实日期计算月相。星际观测不叠加天气浮层。
 - 调整自动亮度曲线；60 秒无触摸后暂时降亮；所有表盘支持原生夜间息屏，首次触摸只唤醒。
-- 可选 NAS 媒体服务：按文件夹选择照片，单独选择视频和音乐；3–60 秒轮播、提前缓存下一张、无切换音效。
+- 可选 NAS 媒体服务：按文件夹选择照片，单独选择视频和音乐；照片、视频、音乐独立入口；3–60 秒随机轮播、提前缓存下一张、无切换音效。
 - 可选 Apple Silicon 本地语音服务：实时部分转写，停止后处理已采集的尾段；不落盘保存麦克风音频或转写。
 - Wi‑Fi 驱动锁顺序修复：从自己的原模块生成补丁，单次启动试用、确认后启用、未确认启动后回退。
 
 传感器、表盘和本地历史不依赖 NAS、Mac 或 USB。照片、视频和音乐通过 Wi‑Fi 访问 NAS；USB / 无线 ADB 用于安装和调试。天气沿用原厂天气数据，数据不可用时会如实显示。
+
+## Codex Micro
+
+把触摸屏变成桌面控制面板：六枚任务状态键、方向摇杆、推理强度旋钮和可映射的快捷操作。可用动作由已连接的兼容服务声明，未配置的键会变暗。需要已有 NAS 网关与 Mac 适配器；此仓库提供设备端，不包含 ARL / Codex 桌面适配器。[功能与连接边界](docs/MICRO.md)。
+
+<img src="docs/previews/micro.png" width="480" alt="Codex Micro 控制面板，使用虚构任务状态">
 
 ## 安装
 

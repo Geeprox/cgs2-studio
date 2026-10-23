@@ -1,0 +1,16 @@
+import QtQuick 2.14
+Item{
+ id:root;width:720;height:720
+ property string kind:'@KIND@'
+ QtObject{
+  id:demo;property bool displayAwake:true;property bool nightWindowActive:false;property int uptime:1000;property var last:({})
+  function write(url,v){if(String(url).indexOf('request.json')>=0)last=v;return true}
+  function read(url,cb){cb({protocol:2,requestId:last.id||'',stateUptimeMs:1000001,mediaKind:root.kind,enabled:true,albumName:'示例媒体',revision:'aaaaaaaaaaaaaaaaaaaaaaaa',offset:0,hasMore:false,intervalMs:3000,current:last.index||0,nextIndex:1,nextPage:0,nextPreview:'file://@REMOTE@/media/cache/sample.jpg',items:[{id:'1',kind:root.kind,title:'示例文件',previewReady:true,preview:'file://@REMOTE@/media/cache/sample.jpg'},{id:'2',kind:root.kind,title:'另一份示例文件',previewReady:true,preview:'file://@REMOTE@/media/cache/sample.jpg'}]})}
+ }
+ MediaPanel{id:panel;anchors.fill:parent;mediaKind:root.kind;store:demo}
+ Timer{interval:1800;running:true;onTriggered:{
+  if(panel.mediaKind!==root.kind||!panel.selected||panel.selected.kind!==root.kind){console.error('MEDIA_KIND_FAILED');Qt.quit();return}
+  panel.controls=true;
+  panel.grabToImage(function(r){console.info('CGS2_PREVIEW_SAVED '+r.saveToFile('@REMOTE@/screens/@NAME@.png'));Qt.quit()})
+ }}
+}

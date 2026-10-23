@@ -15,3 +15,9 @@ assert.equal(c.nextPreview({items:[{previewReady:true,preview:'file:///tmp/cgs2-
 assert.equal(c.nextPreview(page,23),'');
 assert(!q.includes('正在载入照片'));assert(q.includes('preloadSource:p.nextPhoto'));
 console.log('PASS media navigation/readiness, prefetch publication, no loading toast and lifecycle checks (Node JS; not native Qt)');
+
+const shuffled={...page,mediaKind:'photo',nextPage:0,nextIndex:17,nextPreview:'file:///tmp/cgs2-media/cache/18.jpg'};
+same(c.target(shuffled,0,1,true),{page:0,index:17});
+same(c.target({...shuffled,nextPreview:''},0,1,true),null);
+assert.equal(c.nextPreview(shuffled,0),shuffled.nextPreview);
+same(c.target({...page,offset:24,hasPrevious:false},0,-1,false),null);

@@ -1,10 +1,16 @@
 .pragma library
 function interval(value){var n=Number(value);return isFinite(n)?Math.max(3000,Math.min(60000,Math.round(n))):10000}
 function target(media,current,direction,automatic){
+ if(automatic&&media&&media.mediaKind==='photo'){
+  if(!nextPreview(media,current))return null;
+  if(Number(media.nextIndex)>=0)return {page:Number(media.nextPage)||0,index:Number(media.nextIndex)};
+  if(Number(media.nextPage)!==(Number(media.offset)||0))return {page:Number(media.nextPage)||0,index:0};
+  return null;
+ }
  var items=media&&media.items||[],offset=Number(media&&media.offset)||0,n=items.length;
  if(!n)return null;
  var next=current+(direction<0?-1:1);
- if(next<0)return offset>0?{page:Math.max(0,offset-24),index:23}:null;
+ if(next<0)return offset>0&&media.hasPrevious!==false?{page:Math.max(0,offset-24),index:23}:null;
  if(next<n)return {page:offset,index:next};
  if(media.hasMore===true)return {page:offset+24,index:0};
  return automatic?{page:0,index:0}:null;
@@ -20,6 +26,7 @@ function readyVideo(media,item){return !!item&&(item.kind==='video'||item.kind==
 
 // Only warm a published, local preview; the client publishes after atomic rename.
 function nextPreview(media,current){
+ if(media&&media.mediaKind==='photo')return readyPhoto({previewReady:true,preview:media.nextPreview})?media.nextPreview:'';
  var next=target(media,current,1,true);
  if(!next||next.page!==(Number(media&&media.offset)||0))return '';
  var item=selected(media,next.index);return readyPhoto(item)?item.preview:'';

@@ -15,8 +15,8 @@ Rectangle{
    if(c.kind===0){for(var y=0;y<2;y++)for(var x=0;x<2;x++)p.strokeRect(7+x*19,7+y*19,13,13)}
    else if(c.kind===1){p.strokeRect(5,6,36,33);for(var y=0;y<2;y++)for(var x=0;x<3;x++)p.strokeRect(10+x*10,12+y*10,5,5);p.moveTo(12,33);p.lineTo(34,33);p.stroke()}
    else if(c.kind===2){p.strokeRect(5,7,36,31);p.moveTo(7,34);p.lineTo(18,22);p.lineTo(25,29);p.lineTo(31,21);p.lineTo(39,32);p.stroke();p.beginPath();p.arc(16,16,3,0,Math.PI*2);p.stroke()}
-   else if(c.kind===3){p.arc(23,23,9,0,Math.PI*2);p.stroke();for(var i=0;i<8;i++){var a=i*Math.PI/4;p.beginPath();p.moveTo(23+Math.cos(a)*15,23+Math.sin(a)*15);p.lineTo(23+Math.cos(a)*20,23+Math.sin(a)*20);p.stroke()}}
-   else if(c.kind===4){p.moveTo(16,9);p.lineTo(36,23);p.lineTo(16,37);p.closePath();p.stroke();p.beginPath();p.moveTo(7,12);p.lineTo(7,34);p.stroke()}
+   else if(c.kind===3){p.strokeRect(4,8,38,30);p.moveTo(18,15);p.lineTo(30,23);p.lineTo(18,31);p.closePath();p.stroke()}
+   else if(c.kind===4){p.moveTo(18,33);p.lineTo(18,10);p.lineTo(36,6);p.lineTo(36,29);p.moveTo(18,16);p.lineTo(36,12);p.stroke();p.beginPath();p.ellipse(6,29,12,9);p.fill();p.beginPath();p.ellipse(24,25,12,9);p.fill()}
    else if(c.kind===5){p.arc(23,24,15,-Math.PI*.7,Math.PI*.9);p.stroke();p.beginPath();p.moveTo(9,9);p.lineTo(10,20);p.lineTo(20,14);p.stroke()}
    else if(c.kind===6){for(var i=0;i<3;i++){p.beginPath();p.arc(23,37,9+i*9,Math.PI*1.24,Math.PI*1.76);p.stroke()}p.beginPath();p.arc(23,37,2.6,0,Math.PI*2);p.fill()}
    else if(c.kind===7){p.moveTo(8,29);p.bezierCurveTo(0,29,1,15,12,16);p.bezierCurveTo(13,2,33,2,35,17);p.bezierCurveTo(46,17,46,30,37,30);p.lineTo(8,30);p.stroke();for(var i=0;i<3;i++){p.beginPath();p.moveTo(14+i*9,35);p.lineTo(11+i*9,40);p.stroke()}}
