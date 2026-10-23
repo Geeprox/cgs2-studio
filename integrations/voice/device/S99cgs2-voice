@@ -1,0 +1,20 @@
+#!/bin/sh
+# Optional boot hook. Idle until an explicit fresh UI start request arrives.
+set -eu
+ROOT=/userdata/cgs2-voice
+case "${1:-}" in
+ start|restart)
+  # The vendor boot script recursively chmods /data (/userdata) to 666.
+  # Restore only this application's fixed directory and regular owned files.
+  [ -d "$ROOT" ] && [ ! -L "$ROOT" ] || exit 1
+  chmod 700 "$ROOT"
+  for name in config.json ca.pem auth-header common.sh client.sh worker.sh consume.sh service.sh;do
+   [ -f "$ROOT/$name" ] && [ ! -L "$ROOT/$name" ] || exit 1
+  done
+  chmod 600 "$ROOT/config.json" "$ROOT/ca.pem" "$ROOT/auth-header"
+  chmod 755 "$ROOT/common.sh" "$ROOT/client.sh" "$ROOT/worker.sh" "$ROOT/consume.sh" "$ROOT/service.sh"
+  ;;
+ stop|status) :;;
+ *) echo 'usage: S99cgs2-voice start|stop|restart|status' >&2;exit 2;;
+esac
+exec /bin/sh "$ROOT/service.sh" "$@"

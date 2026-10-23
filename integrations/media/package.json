@@ -1,0 +1,6 @@
+{
+  "name": "cgs2-media", "version": "0.1.0", "private": true, "type": "module",
+  "description": "Optional LAN-only NAS media service for CGS2 Studio", "license": "MIT",
+  "scripts": {"build":"tsc", "start":"node server.mjs", "test":"npm run build && node --test test.mjs"},
+  "engines":{"node":">=22"}, "devDependencies":{"@types/node":"22.19.0","typescript":"5.9.3"}
+}
