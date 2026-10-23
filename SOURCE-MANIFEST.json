@@ -164,7 +164,7 @@
   "tests/photo_motion.mjs": "5decd5d38ee5a4888b7b8f2668a1a64ed3470e9e4f84f4701447c879a319e7a9",
   "tests/pool.mjs": "5fd3d5f0c82596ac052018cb435d8360adfc62fca7be8977f9b29341136c4380",
   "tests/space.mjs": "dfd0fd940f0310b8da664541e6d9ef5c5d9110b40d0c925c5b83971f64ff75e4",
-  "tests/test_install_transaction.py": "7f2d78a9b5faa6f36bdece99fc8b3423076f1295ff190b1ec87aa7acb1ea65d6",
+  "tests/test_install_transaction.py": "84f9e49cbb6e1567d4b854ba027f002f6b71ce4401a8d53269c338aa7f5224be",
   "tests/test_loader.py": "504e2ef38f8607019152af4c99dfbcf0aba55046131d3fd89744ef8a6e948df6",
   "tests/test_origin.c": "5c34af242a7eba884074c9ee8561c054c8016e94368de2b224eb2da942e93457",
   "tests/test_release_audit.py": "b0bee66b611c8b78d61438034c367ae7fe5bf30c5468b3b01083df8a5e87a22a",

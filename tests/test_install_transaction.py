@@ -34,7 +34,16 @@ class InstallTransaction(unittest.TestCase):
   self.stub('id','echo 0');self.stub('df',"echo 'Filesystem 1024-blocks Used Available Capacity Mounted';echo 'fixture 9999999 0 9999999 0% /'")
   self.stub('pgrep','[ "$1" = -x ] && echo 4240 || exit 1')
   self.stub('pidof','cat "$FIXTURE_ROOT/tmp/running" 2>/dev/null || true')
-  self.stub('flock','exit 0');self.stub('sleep','exit 0')
+  self.stub('flock','exit 0')
+  # The production wait gives its background launcher time to initialize. A zero
+  # duration stub races on fast Linux runners; wait for the synthetic PID fence.
+  self.stub('sleep','''if [ "$1" = 8 ];then
+ n=0
+ while [ ! -s "$FIXTURE_ROOT/tmp/running" ] && [ "$n" -lt 100 ];do
+  n=$((n+1));/bin/sleep .005
+ done
+fi
+exit 0''')
   self.stub('kill','''echo "$*" >> "$FIXTURE_ROOT/tmp/signals"
 case "$1:$2" in -TERM:4242|-TERM:4243)
  echo 'State: Z (zombie)' > "$FIXTURE_ROOT/proc/$2/status"
