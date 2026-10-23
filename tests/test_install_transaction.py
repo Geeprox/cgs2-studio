@@ -35,6 +35,8 @@ class InstallTransaction(unittest.TestCase):
   self.stub('pgrep','[ "$1" = -x ] && echo 4240 || exit 1')
   self.stub('pidof','cat "$FIXTURE_ROOT/tmp/running" 2>/dev/null || true')
   self.stub('flock','exit 0')
+  # Match the device's BusyBox find: -quit is unavailable.
+  self.stub('find',"for arg in \"$@\";do [ \"$arg\" != -quit ] || exit 2;done;exec /usr/bin/find \"$@\"")
   # The production wait gives its background launcher time to initialize. A zero
   # duration stub races on fast Linux runners; wait for the synthetic PID fence.
   self.stub('sleep','''if [ "$1" = 8 ];then
@@ -90,6 +92,13 @@ exit 0''')
   result=self.run_script('install-ui.sh',FAIL_LAUNCH='1');self.assertNotEqual(result.returncode,0)
   self.assertEqual(self.app.read_bytes(),self.original);self.assertTrue((self.base/'userdata/cgs2-ui/qml/old.qml').exists())
   self.assertIn('-CONT 4240',(self.base/'tmp/signals').read_text())
+ def test_symlinks_rejected_with_busybox_find_before_process_signals(self):
+  for location in [self.payload/'qml/linked.qml',self.base/'userdata/cgs2-ui/qml/linked.qml']:
+   with self.subTest(location=location.parent.name):
+    location.symlink_to(self.base/'userdata/cgs2-ui/qml/old.qml');self.manifest()
+    result=self.run_script('install-ui.sh');self.assertNotEqual(result.returncode,0)
+    self.assertIn('linked_',result.stderr);self.assertFalse((self.base/'tmp/signals').exists());self.assertEqual(self.app.read_bytes(),self.original)
+    location.unlink();self.manifest()
  def test_tampered_payload_rejected_before_backup_or_signals(self):
   (self.payload/'qml/new.qml').write_text('tampered')
   result=self.run_script('install-ui.sh');self.assertNotEqual(result.returncode,0)

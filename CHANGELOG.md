@@ -4,6 +4,7 @@
 
 - Preserve all four vendor EGLFS dimensions during installer restarts to avoid
   incorrect full-screen scaling; verify the child process environment in tests.
+- Keep symlink checks compatible with the device BusyBox find implementation.
 
 - Separate photo, video and music pages; move weather and face-motion switches
   into Display & Connection.

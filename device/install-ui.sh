@@ -28,8 +28,8 @@ fi
 if [ -f /tmp/cgs2-ui/screen-state.json ];then
  jq -e '.microActive!=true and .mediaActive!=true' /tmp/cgs2-ui/screen-state.json >/dev/null || fail media_or_remote_session_active
 fi
-[ -z "$(find "$PAYLOAD" -type l -print -quit)" ] || fail linked_payload
-[ ! -d "$UI/qml" ] || [ -z "$(find "$UI/qml" -type l -print -quit)" ] || fail linked_existing_qml
+[ -z "$(find "$PAYLOAD" -type l -print)" ] || fail linked_payload
+[ ! -d "$UI/qml" ] || [ -z "$(find "$UI/qml" -type l -print)" ] || fail linked_existing_qml
 free=$(df -Pk /userdata | awk 'END{print $4}')
 need=$(du -sk "$PAYLOAD" | awk '{print $1}')
 [ "$free" -gt $((need*2+32768)) ] || fail insufficient_backup_space
