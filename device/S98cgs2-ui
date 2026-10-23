@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+UI=/userdata/cgs2-ui
+case "${1:-}" in
+ start)
+  [ -d "$UI" ] && [ ! -L "$UI" ] || exit 1
+  chmod 700 "$UI"
+  chmod 755 "$UI/recovery-agent.sh" "$UI/history-export.sh"
+  find "$UI/qml" -type d -exec chmod 755 {} \;
+  /usr/bin/setsid /bin/sh "$UI/recovery-agent.sh" >/dev/null 2>&1 </dev/null &
+  ;;
+ stop) for p in $(pgrep -f '^/bin/sh /userdata/cgs2-ui/recovery-agent.sh$');do kill -TERM "$p";done;;
+ restart) "$0" stop;sleep 1;"$0" start;;
+ *) exit 2;;
+esac

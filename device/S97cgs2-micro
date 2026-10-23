@@ -1,0 +1,22 @@
+#!/bin/sh
+# Private LAN status client only. Does not alter or reload the device UI.
+ROOT=/userdata/cgs2-micro
+RUN=/tmp/cgs2-micro-lan
+case "${1:-}" in
+start)
+ mkdir -p "$RUN";chmod 700 "$RUN"
+ CGS2_MICRO_CONF="$ROOT" CGS2_MICRO_RUN="$RUN" nohup setsid sh "$ROOT/micro-client.sh" > "$RUN/client.log" 2>&1 </dev/null &
+ ;;
+stop)
+ if [ -f "$RUN/client.pid" ];then
+  pid=$(cat "$RUN/client.pid")
+  case "$pid" in ''|*[!0-9]*) exit 1;;esac
+  if [ -r "/proc/$pid/cmdline" ] && tr '\000' ' ' < "/proc/$pid/cmdline" | grep -Fq "$ROOT/micro-client.sh";then
+   kill "$pid"
+   n=0;while kill -0 "$pid" 2>/dev/null;do n=$((n+1));[ "$n" -le 12 ] || exit 1;sleep 1;done
+  fi
+ fi
+ ;;
+restart) "$0" stop;sleep 1;"$0" start;;
+*) echo 'Usage: service start|stop|restart';exit 1;;
+esac

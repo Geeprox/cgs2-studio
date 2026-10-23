@@ -1,0 +1,11 @@
+{
+  "source": "qml/textures/pool-depth-v3.png",
+  "sourceSha256": "ac9081b51b92ff5a2a90e8777b44b64e243aed6dbc77c5ae942ed10c5d40f953",
+  "method": "Local original-material median blend and highlight extraction",
+  "runtime": "3 permanent Image textures; 15Hz transform updates only; no texture source replacement",
+  "generated": {
+    "pool-still-v4.png": "a9979f0aa36b8c60134d0736cfa2d1ffa3103f3dd1388d65a63818c11d9bed96",
+    "caustics-a-v4.png": "6a28b38b680daab19507a5ee1c300bc7f890e612c8a38b54d16d0ccf50eb77ba",
+    "caustics-b-v4.png": "027ea6a872850f6d2e140ebaf6ceb82966b4942be5c9c8cdc899b90acf718d82"
+  }
+}

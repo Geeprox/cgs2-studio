@@ -1,0 +1,39 @@
+import QtQuick 2.14
+import 'FaceLogic.js' as F
+import 'SpatialProjection.js' as Space
+import 'NightScreen.js' as Night
+Item {
+ id:root;width:720;height:720
+ QtObject{id:locationController;property string cityName:'示例城市';property var weatherData:({isValid:false,temperature:'22',skycon:'CLEAR_DAY'})}
+ QtObject{id:global;property string currentSensorNameOfDataPage:'airPM25'}
+ QtObject{id:screenManager;property bool isScreenOn:true;property bool isAutoBrightness:false;property int brightnessValue:800;property int touches:0;function onInterfaceTouched(){touches++}}
+ QtObject{id:nativeNight;property bool enabled:false;property int startMinutes:1380;property int endMinutes:420;property int writes:0;onEnabledChanged:writes++;onStartMinutesChanged:writes++;onEndMinutesChanged:writes++}
+ QtObject{id:datetimeManager;property var nightTimer:nativeNight}
+ QtObject{id:pm25;property string valueString:'6';property string name:'PM2.5';property string unitString:'µg/m³';property int state:0;property string evalutionDescription:'优';property color evalutionColor:'#b7ed4c'}
+ QtObject{id:pm10;property string valueString:'12';property string name:'PM10';property string unitString:'µg/m³';property int state:0;property string evalutionDescription:'优';property color evalutionColor:'#b7ed4c'}
+ QtObject{id:co2;property string valueString:'802';property string name:'CO₂';property string unitString:'ppm';property int state:0;property string evalutionDescription:'正常';property color evalutionColor:'#e3e763'}
+ QtObject{id:tvoc;property string valueString:'49';property string name:'eTVOC';property string unitString:'VOC 指数';property int state:0;property string evalutionDescription:'优';property color evalutionColor:'#c1a2f5'}
+ QtObject{id:noise;property string valueString:'38';property string name:'噪声';property string unitString:'dB';property int state:0;property string evalutionDescription:'低';property color evalutionColor:'#ff954e'}
+ QtObject{id:temp;property string valueString:'25.4';property string name:'温度';property string unitString:'°C';property int state:0;property string evalutionDescription:'适宜';property color evalutionColor:'#68cee7'}
+ QtObject{id:humi;property string valueString:'44';property string name:'湿度';property string unitString:'%RH';property int state:0;property string evalutionDescription:'适宜';property color evalutionColor:'#719cf2'}
+ QtObject{id:airdataController;property var airPM25:pm25;property var airPM10:pm10;property var airCO2:co2;property var airTEMP:temp;property var airHUMI:humi;property var airTVOC:tvoc;property var airNoise:noise}
+ UiState{id:state}
+ Dashboard{id:dash;anchors.fill:parent;store:state;spatialPreview:false}
+ function find(o,n,a){if(!o)return a;if(o.objectName===n)a.push(o);if(o.children)for(var i=0;i<o.children.length;i++)find(o.children[i],n,a);return a}
+ function one(o,n){return find(o,n,[])[0]}
+ property bool shotReady:false
+ property var results:({})
+
+ property int previewSkin:@SKIN@
+ property int retries:0
+ Timer{interval:150;running:true;onTriggered:{state.faceMotion=false;state.edgeWeather=false;state.chooseSkin(root.previewSkin);capture.start()}}
+ Timer{id:capture;interval:400;onTriggered:{
+  var creative=one(dash,'creativeLoader').item;
+  if(dash.creative&&(!creative||creative.ready===false)){
+   if(++root.retries>12){console.error('PREVIEW_NOT_READY');Qt.quit();return}
+   capture.restart();return
+  }
+  dash.clock=new Date(2026,9,24,10,24,36);
+  dash.grabToImage(function(result){console.info('CGS2_PREVIEW_SAVED '+result.saveToFile('@REMOTE@/screens/face-@SKIN@.png'));Qt.quit()});
+ }}
+}

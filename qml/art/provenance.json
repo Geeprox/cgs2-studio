@@ -1,0 +1,8 @@
+{
+  "generator": "OpenAI image_gen",
+  "inputs": "Original prompt-only illustration. No personal media or reference image input.",
+  "prompt": "An original illustrated retro-futurist observatory with a deep night palette, textured painted planets and architectural forms, composition reserving a legible clock area and sensor panel. Square; no typography.",
+  "files": {
+    "observatory.png": "11b4e444a87c68b4804fc0cb85e52d5cf485a1867ac8dfa4b27fd7b8f1a937ec"
+  }
+}

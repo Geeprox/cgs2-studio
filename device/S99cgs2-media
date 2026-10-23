@@ -1,0 +1,17 @@
+#!/bin/sh
+# Factory start.sh resets /data permissions before S99; restore only our own entry.
+UI=/userdata/cgs2-ui
+[ -d "$UI" ] && [ ! -L "$UI" ] || exit 1
+[ -f "$UI/media-client.sh" ] && [ ! -L "$UI/media-client.sh" ] || exit 1
+chmod 700 "$UI"
+chmod 755 "$UI/media-client.sh"
+CONF=/userdata/cgs2-media
+[ -f "$CONF/origin" ] || CONF=/userdata/cgs2-micro
+[ -d "$CONF" ] && [ ! -L "$CONF" ] || exit 1
+for name in origin ca.pem auth-header;do [ -f "$CONF/$name" ] && [ ! -L "$CONF/$name" ] || exit 1;done
+chmod 700 "$CONF";chmod 600 "$CONF/origin" "$CONF/ca.pem" "$CONF/auth-header"
+case "$1" in
+ start) /bin/sh "$UI/media-proxy-service.sh" start;start-stop-daemon -S -b -m -p /tmp/cgs2-media.pid -x /bin/sh -- /userdata/cgs2-ui/media-client.sh;;
+ stop) start-stop-daemon -K -p /tmp/cgs2-media.pid;/bin/sh "$UI/media-proxy-service.sh" stop;;
+ restart) "$0" stop;sleep 1;"$0" start;;
+esac

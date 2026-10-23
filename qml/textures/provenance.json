@@ -1,0 +1,13 @@
+{
+  "generator": "OpenAI built-in image_gen",
+  "inputs": "Prompt-only original followed by edits of generated assets; no personal photo or reference screenshot uploaded.",
+  "size": [
+    1254,
+    1254
+  ],
+  "metadata": "C2PA authenticity record retained; no EXIF or text chunks.",
+  "promptFile": "generation-prompts.json",
+  "files": {
+    "pool-depth-v3.png": "ac9081b51b92ff5a2a90e8777b44b64e243aed6dbc77c5ae942ed10c5d40f953"
+  }
+}
