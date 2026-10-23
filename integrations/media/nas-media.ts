@@ -4,11 +4,14 @@ import path from 'node:path';
 import os from 'node:os';
 import {createHash,randomBytes} from 'node:crypto';
 import {spawn} from 'node:child_process';
+import {pairingIdentifier} from './live-photo.js';
+import {LiveCache} from './live-cache.js';
 import type {IncomingMessage,ServerResponse} from 'node:http';
 
 type Source={source:'photos'|'nas';enabled:boolean;deviceId:string;intervalMs:number;folder:string;files:string[];recursive:boolean;revision:string};
 type Root={label:string;path:string};
-type Item={id:string;file:string;size:number;mtime:number;ino:number;kind:'photo'|'video'|'audio'};
+type Fingerprint={file:string;size:number;mtime:number;ino:number};
+type Item={motion?:Fingerprint;live?:boolean;id:string;file:string;size:number;mtime:number;ino:number;kind:'photo'|'video'|'audio'};
 const photo=new Set(['.jpg','.jpeg','.png','.webp','.bmp','.heic','.heif']);
 const video=new Set(['.mp4','.m4v','.mov','.mkv','.webm','.avi','.ts']);
 const audio=new Set(['.mp3','.m4a','.wav','.flac','.ogg']);
@@ -29,9 +32,11 @@ export function parseRange(value:string|undefined,size:number){
  if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start>=size||start<0||end<start)throw Error('range');return {start,end:Math.min(end,size-1),status:206};
 }
 export class NasMedia{
+ private liveCache:LiveCache;private pairs=new Map<string,boolean>();
  private value:Source={source:'photos',enabled:false,deviceId:'',intervalMs:10000,folder:'',files:[],recursive:true,revision:''};
  private items=new Map<string,Item>();private listed:Item[]=[];private currentRevision='';private indexedAt=0;private indexing?:Promise<void>;private previews=new Map<string,Buffer>();private renders=0;private children=new Set<ReturnType<typeof spawn>>();private streams=new Set<fs.ReadStream>();
  constructor(private configFile:string,private options:{roots?:Root[];ffmpeg?:string;convert?:string;placeholder:Buffer}){
+  this.liveCache=new LiveCache(path.join(path.dirname(configFile),'.cgs2-live-cache'),()=>this.ffmpeg());
   try{const v=JSON.parse(fs.readFileSync(configFile,'utf8'));if(v.source==='photos'||v.source==='nas'){if(typeof v.enabled==='boolean'&&typeof v.deviceId==='string'&&Number.isInteger(v.intervalMs)&&v.intervalMs>=3000&&v.intervalMs<=60000&&typeof v.folder==='string'&&Array.isArray(v.files)&&v.files.length<=64&&v.files.every((x:unknown)=>typeof x==='string')&&/^[a-f0-9]{24}$/.test(v.revision))this.value=v;}}catch{}
  }
  roots():Root[]{
@@ -79,14 +84,24 @@ export class NasMedia{
    for(const d of entries){if(++inspected>20000||paths.length>=5000)break;if(hidden(d.name)||d.isSymbolicLink())continue;const p=path.join(dir,d.name);if(d.isFile()&&photo.has(path.extname(d.name).toLowerCase()))paths.push(p);else if(d.isDirectory()&&config.recursive)await scan(p,depth+1);}await new Promise<void>(r=>setImmediate(r));
   };if(config.folder)await scan(config.folder,0);paths.push(...config.files);
    const rows:Item[]=[];for(const file of [...new Set(paths)]){try{const {st}=this.resolve(file);if(st.size<=0)continue;const ext=path.extname(file).toLowerCase();const id=String(parseInt(hash(file).slice(0,9),16));rows.push({id,file,size:st.size,mtime:st.mtimeMs,ino:st.ino,kind:photo.has(ext)?'photo':audio.has(ext)?'audio':'video'});}catch{}}
-   if(config!==this.value)throw Error('媒体选择已更新，请刷新');const revision=hash(config.revision+rows.map(r=>r.id+':'+r.size+':'+r.mtime).join('|')).slice(0,24);if(revision!==this.currentRevision)this.previews.clear();this.currentRevision=revision;this.listed=rows;this.items=new Map(rows.map(r=>[r.id,r]));this.indexedAt=Date.now();
+   if(config!==this.value)throw Error('媒体选择已更新，请刷新');for(const row of rows)if(row.kind==='photo'){const stem=row.file.slice(0,-path.extname(row.file).length);for(const ext of ['.MOV','.mov']){try{const movie=this.resolve(stem+ext);if(movie.st.size>0&&movie.st.size<=128*1024*1024){row.motion={file:movie.target,size:movie.st.size,mtime:movie.st.mtimeMs,ino:movie.st.ino};break;}}catch{}}}
+   const revision=hash(config.revision+rows.map(r=>r.id+':'+r.size+':'+r.mtime+':'+r.ino+(r.motion?':'+r.motion.size+':'+r.motion.mtime+':'+r.motion.ino:'')).join('|')).slice(0,24);if(revision!==this.currentRevision)this.previews.clear();this.currentRevision=revision;this.listed=rows;this.items=new Map(rows.map(r=>[r.id,r]));this.indexedAt=Date.now();
   })();try{await this.indexing}finally{this.indexing=undefined}
  }
- async manifest(id:string,offset:number){if(!this.allowed(id))return {enabled:false,items:[]};if(!Number.isInteger(offset)||offset<0||offset>100000)throw Error('分页无效');await this.index();if(!this.allowed(id))return {enabled:false,items:[]};
-  return {enabled:true,source:'nas',revision:this.currentRevision,albumName:this.value.folder?path.basename(this.value.folder):'NAS 媒体',intervalMs:this.value.intervalMs,offset,hasMore:this.listed.length>offset+24,items:this.listed.slice(offset,offset+24).map(r=>({id:r.id,kind:r.kind,title:path.basename(r.file),streamable:r.kind!=='photo',preview:'/api/media/item/'+r.id+'/preview?revision='+this.currentRevision,playback:r.kind!=='photo'?'/api/media/item/'+r.id+'/video?revision='+this.currentRevision:undefined}))};
+ async manifest(id:string,offset:number,kind='all'){if(!this.allowed(id))return {enabled:false,items:[]};if(!['all','photo','video','audio'].includes(kind)||!Number.isInteger(offset)||offset<0||offset>100000)throw Error('分页无效');await this.index();if(!this.allowed(id))return {enabled:false,items:[]};
+  const visible=kind==='all'?this.listed:this.listed.filter(r=>r.kind===kind);
+  for(const row of visible.slice(offset,offset+24)){this.hydrate(row);await new Promise<void>(r=>setImmediate(r));}
+  if(!this.allowed(id))return {enabled:false,items:[]};
+  return {enabled:true,mediaKind:kind,total:visible.length,source:'nas',revision:this.currentRevision,albumName:this.value.folder?path.basename(this.value.folder):'NAS 媒体',intervalMs:this.value.intervalMs,offset,hasMore:visible.length>offset+24,items:visible.slice(offset,offset+24).map(r=>({id:r.id,kind:r.kind,title:path.basename(r.file),live:r.live===true,streamable:r.kind!=='photo'||r.live===true,preview:'/api/media/item/'+r.id+'/preview?revision='+this.currentRevision,playback:r.kind!=='photo'||r.live===true?'/api/media/item/'+r.id+'/video?revision='+this.currentRevision:undefined}))};
+ }
+ private hydrate(item:Item){
+  if(item.kind!=='photo'||!item.motion)return;
+  const signature=item.id+':'+item.size+':'+item.mtime+':'+item.ino+':'+item.motion.size+':'+item.motion.mtime+':'+item.motion.ino;
+  if(!this.pairs.has(signature)){let paired=false;try{this.resolve(item.file);const movie=this.resolve(item.motion.file);if(movie.st.size===item.motion.size&&movie.st.mtimeMs===item.motion.mtime&&movie.st.ino===item.motion.ino){const still=pairingIdentifier(item.file);paired=!!still&&still===pairingIdentifier(item.motion.file,true);}}catch{}this.pairs.set(signature,paired);while(this.pairs.size>256)this.pairs.delete(this.pairs.keys().next().value!);}
+  item.live=this.pairs.get(signature)===true;
  }
  private async item(id:string,itemId:string,revision:string){if(!this.allowed(id)||revision!==this.currentRevision)throw Error('媒体选择已更新，请刷新');const item=this.items.get(itemId);if(!item)throw Error('媒体未被选中');const {st}=this.resolve(item.file);if(st.size!==item.size||st.mtimeMs!==item.mtime||st.ino!==item.ino){this.indexedAt=0;throw Error('文件已更新，请刷新');}return item;}
- private ffmpeg(){return this.options.ffmpeg||['/usr/bin/ffmpeg','/bin/ffmpeg','/var/packages/ffmpeg/target/bin/ffmpeg','/var/packages/ffmpeg7/target/bin/ffmpeg','/var/packages/SynologyPhotos/target/usr/bin/ffmpeg','/var/packages/SynologyPhotos/target/bin/ffmpeg','/var/packages/CodecPack/target/bin/ffmpeg'].find(p=>{try{fs.accessSync(p,fs.constants.X_OK);return true}catch{return false}});}
+ private ffmpeg(){return this.options.ffmpeg||[path.join(path.dirname(this.configFile),'../runtime/cgs2-tools/ffmpeg'),'/usr/bin/ffmpeg','/bin/ffmpeg','/var/packages/ffmpeg/target/bin/ffmpeg','/var/packages/ffmpeg7/target/bin/ffmpeg','/var/packages/SynologyPhotos/target/usr/bin/ffmpeg','/var/packages/SynologyPhotos/target/bin/ffmpeg','/var/packages/CodecPack/target/bin/ffmpeg'].find(p=>{try{fs.accessSync(p,fs.constants.X_OK);return true}catch{return false}});}
  async preview(id:string,itemId:string,revision:string){const item=await this.item(id,itemId,revision);if(this.previews.has(itemId))return this.previews.get(itemId)!;if(item.kind==='audio')return this.options.placeholder;
   // Use an existing, selected-file-specific NAS thumbnail when available.
   for(const name of ['SYNOPHOTO_THUMB_XL.jpg','SYNOPHOTO_THUMB_L.jpg']){try{const p=path.join(path.dirname(item.file),'@eaDir',path.basename(item.file),name);const real=fs.realpathSync(p),st=fs.statSync(p);if(real===p&&st.isFile()&&st.size>0&&st.size<=4*1024*1024){const b=fs.readFileSync(p);if(b[0]===255&&b[1]===216){await this.item(id,itemId,revision);return b;}}}catch{}}
@@ -96,7 +111,15 @@ export class NasMedia{
   }else if(item.kind==='video')data=this.options.placeholder;else if(item.size<=4*1024*1024){data=fs.readFileSync(item.file);if(!smallRaster(data))throw Error('NAS 需要启用照片预览工具');}else throw Error('NAS 需要启用照片预览工具');
   await this.item(id,itemId,revision);this.previews.set(itemId,data);while(this.previews.size>8)this.previews.delete(this.previews.keys().next().value!);return data;
  }
- async stream(id:string,itemId:string,revision:string,req:IncomingMessage,res:ServerResponse){const item=await this.item(id,itemId,revision);if(item.kind==='photo')throw Error('请选择视频或音乐');let range;
+ async stream(id:string,itemId:string,revision:string,req:IncomingMessage,res:ServerResponse){let item=await this.item(id,itemId,revision);
+  if(item.kind==='photo'){
+   this.hydrate(item);if(!item.live||!item.motion)throw Error('当前照片没有可用动态');
+   const motion=item.motion,current=this.resolve(motion.file).st;if(current.size!==motion.size||current.mtimeMs!==motion.mtime||current.ino!==motion.ino)throw Error('动态文件已变化');
+   const converted=await this.liveCache.prepare(motion.file,motion.size+':'+motion.mtime+':'+motion.ino);
+   await this.item(id,itemId,revision);const source=this.resolve(motion.file).st;if(source.size!==motion.size||source.mtimeMs!==motion.mtime||source.ino!==motion.ino)throw Error('动态文件已变化');
+   const st=fs.statSync(converted);item={id:item.id,file:converted,size:st.size,mtime:st.mtimeMs,ino:st.ino,kind:'video'};
+  }
+  let range;
   try{range=parseRange(req.headers.range,item.size);}catch{res.writeHead(416,{'Content-Range':'bytes */'+item.size,'Content-Length':'0'});res.end();return;}
   const fd=fs.openSync(item.file,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW);let stream:fs.ReadStream|undefined;
   try{const actual=fs.fstatSync(fd);const opened=process.platform==='linux'?fs.realpathSync('/proc/self/fd/'+fd):fs.realpathSync(item.file);if(opened!==item.file||actual.ino!==item.ino||actual.size!==item.size||actual.mtimeMs!==item.mtime)throw Error('文件已变化');
@@ -106,5 +129,5 @@ export class NasMedia{
    stream=fs.createReadStream(item.file,{fd,autoClose:true,start:range.start,end:range.end,highWaterMark:65536});this.streams.add(stream);stream.on('close',()=>this.streams.delete(stream!));stream.on('error',()=>res.destroy());res.on('close',()=>stream?.destroy());stream.pipe(res);
   }catch(e){if(!stream)fs.closeSync(fd);throw e;}
  }
- close(){for(const c of this.children)c.kill();for(const s of this.streams)s.destroy();}
+ close(){this.liveCache.close();for(const c of this.children)c.kill();for(const s of this.streams)s.destroy();}
 }

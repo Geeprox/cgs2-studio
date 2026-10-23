@@ -54,7 +54,7 @@ export function createMediaServer(config,privateDir){
    if(route==='/api/media/browse'&&isAdmin&&req.method==='POST'&&req.headers.origin===origins){json(res,200,nas.browse(await body(req)));return;}
    if(isDevice&&['GET','HEAD'].includes(req.method)){
     const provider=selected();
-    if(route==='/api/media/manifest'){json(res,200,provider?await provider.manifest('cgs2',Number(url.searchParams.get('offset')||0)):{enabled:false,items:[]});return;}
+    if(route==='/api/media/manifest'){json(res,200,provider?await provider.manifest('cgs2',Number(url.searchParams.get('offset')||0),url.searchParams.get('kind')||'all'):{enabled:false,items:[]});return;}
     const m=route.match(/^\/api\/media\/item\/([0-9]{1,12})\/(preview|video)$/),revision=url.searchParams.get('revision')||'';
     if(m&&provider&&provider.allowed('cgs2')){
      if(provider===nas){

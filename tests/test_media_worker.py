@@ -1,12 +1,14 @@
 # SPDX-License-Identifier: MIT
 """Execute the real shell worker with a bounded synthetic NAS transport."""
-import json,os,signal,subprocess,tempfile,time,unittest
+import json,os,signal,subprocess,tempfile,time,unittest,shutil
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 class WorkerTest(unittest.TestCase):
  def setUp(self):
   self.tmp=tempfile.TemporaryDirectory(prefix='cgs2-worker-');self.root=Path(self.tmp.name);self.run=self.root/'run';self.run.mkdir();self.bin=self.root/'bin';self.bin.mkdir();self.conf=self.root/'conf';self.conf.mkdir()
   (self.conf/'origin').write_text('https://10.0.0.1:6080');(self.root/'uptime').write_text('1000.0 0');self.write('presence.json',{'uptime':1000,'active':True})
+  real_jq=shutil.which('jq')
+  (self.bin/'jq').write_text('#!/usr/bin/env python3\nimport os,re,sys\nif re.search(r"\\b(?:test|match|sub|gsub)\\s*\\("," ".join(sys.argv[1:])):sys.exit("device jq lacks regex")\nos.execv('+repr(real_jq)+',["jq"]+sys.argv[1:])\n');(self.bin/'jq').chmod(0o755)
   (self.bin/'flock').write_text('#!/bin/sh\nexit 0\n');(self.bin/'flock').chmod(0o755)
   curl='''#!/usr/bin/env python3
 import sys,json,pathlib,urllib.parse,os,time
@@ -15,7 +17,7 @@ if u.path=='/api/media/manifest':
  page=urllib.parse.parse_qs(u.query)['offset'][0];raw=(root/('page-'+page+'.json')).read_text();dest.write_text(raw);(root/'authorized.json').write_text(json.dumps([x['id'] for x in json.loads(raw)['items']]))
 else:
  if u.path.split('/')[-2] not in json.loads((root/'authorized.json').read_text()):sys.exit(1)
- dest.write_bytes(b'synthetic-jpeg')
+ dest.write_bytes(b'synthetic-mp4' if u.path.endswith('/video') else b'synthetic-jpeg')
 '''
   (self.bin/'curl').write_text(curl);(self.bin/'curl').chmod(0o755)
   s=(ROOT/'device/media-client.sh').read_text().replace('/tmp/cgs2-media',str(self.run)).replace('/userdata/cgs2-media',str(self.conf)).replace('/userdata/cgs2-micro',str(self.conf)).replace('/userdata/cgs2-ui/cache/media',str(self.root/'video')).replace('/proc/uptime',str(self.root/'uptime'))
@@ -69,6 +71,24 @@ else:
   cached=self.run/'cache'/('a'*24+'-'+photo_id+'.jpg');cached.unlink(missing_ok=True)
   v=self.request('photo',index=target,next_ready=True)
   self.assertEqual(v['items'][v['current']]['id'],photo_id);self.assertTrue(cached.exists());self.assertEqual(v['error'],'')
+ def test_live_cache_and_global_shuffle(self):
+  self.page(0,[(1,'photo'),(2,'photo'),(3,'photo')]);p=self.root/'page-0.json';v=json.loads(p.read_text());v.update(mediaKind='photo',total=3)
+  for item in v['items']:item['live']=True;item['streamable']=True
+  p.write_text(json.dumps(v));self.start();v=self.request('photo',video=True,next_ready=True)
+  self.assertEqual(v['readyVideoId'],'1');self.assertTrue(v['items'][0]['liveReady']);self.assertTrue(Path(v['items'][0]['playback'][7:]).is_file())
+  seen={'1'}
+  for _ in range(2):
+   v=self.request('photo',page=v['nextPage'],index=v['nextIndex'],next_ready=True);item=v['items'][v['current']]
+   self.assertNotIn(item['id'],seen);seen.add(item['id'])
+  self.assertEqual(len(seen),3);self.assertLessEqual(len(list((self.root/'video').glob('*.mp4'))),2)
+ def test_global_shuffle_prefetches_typed_pages_with_device_jq(self):
+  self.page(0,[(i,'photo') for i in range(1,25)],True);self.page(24,[(25,'photo'),(26,'photo')])
+  for offset in [0,24]:
+   p=self.root/('page-'+str(offset)+'.json');v=json.loads(p.read_text());v.update(mediaKind='photo',total=26);p.write_text(json.dumps(v))
+  (self.bin/'od').write_text('#!/bin/sh\necho 23\n');(self.bin/'od').chmod(0o755)
+  self.start();v=self.request('photo',next_ready=True);self.assertEqual(v['nextPage'],24);self.assertEqual(v['nextIndex'],0)
+  v=self.request('photo',page=v['nextPage'],index=v['nextIndex'],next_ready=True);self.assertEqual(v['items'][v['current']]['id'],'25');self.assertEqual(v['nextPage'],24);self.assertEqual(v['nextIndex'],1)
+  v=self.request('photo',page=v['nextPage'],index=v['nextIndex'],next_ready=True);self.assertEqual(v['items'][v['current']]['id'],'26');self.assertEqual(v['nextPage'],0)
  def test_no_matching_media_is_empty_not_wrong_kind(self):
   self.page(0,[(1,'photo')]);self.start();v=self.request('audio');self.assertEqual(v['items'],[])
 if __name__=='__main__':unittest.main()

@@ -36,6 +36,7 @@ offset=0
 source_page=-1
 media_kind=all
 seen='[]'
+shuffle_left='[]'
 next_index=-1
 next_page=0
 next_id=''
@@ -85,25 +86,27 @@ status(){
   done
  fi
  ids=$(printf '%b' "$cached" | jq -Rsc 'split("\n")|map(select(length>0))')
+ video_ids=$(for file in "$VIDEO_DIR/$revision"-*.mp4;do [ -s "$file" ] || continue;name=${file##*/};name=${name#"$revision"-};name=${name%.mp4};printf '%s\n' "$name";done | jq -Rsc 'split("\n")|map(select(length>0 and length<=12 and (explode|all(.[];.>=48 and .<=57))))')
  stamp=$(awk '{printf "%.0f",$1*1000}' /proc/uptime)
  if [ -s "$RUN/remote.json" ];then
-  jq --arg run "file://$RUN/cache/" --arg videoRun "file://$VIDEO_DIR/" --arg proxy 'http://127.0.0.1:6097/media/' --arg rev "$revision" --arg err "$error" --arg ack "$last_request" --argjson busy "$busy" --argjson current "$selected" --arg ready "$ready_video" --argjson cached "$ids" --argjson stamp "$stamp" --arg kind "$media_kind" --arg nextId "$next_id" --argjson hasPrevious "$has_previous" --argjson nextIndex "$next_index" --argjson nextPage "$next_page" '
+  jq --arg run "file://$RUN/cache/" --arg videoRun "file://$VIDEO_DIR/" --arg proxy 'http://127.0.0.1:6097/media/' --arg rev "$revision" --arg err "$error" --arg ack "$last_request" --argjson busy "$busy" --argjson current "$selected" --arg ready "$ready_video" --argjson videoIds "$video_ids" --argjson cached "$ids" --argjson stamp "$stamp" --arg kind "$media_kind" --arg nextId "$next_id" --argjson hasPrevious "$has_previous" --argjson nextIndex "$next_index" --argjson nextPage "$next_page" '
    .+{hasPrevious:$hasPrevious,nextPreview:(if ($cached|index($nextId)!=null) then $run+$rev+"-"+$nextId+".jpg" else "" end),mediaKind:$kind,nextIndex:$nextIndex,nextPage:$nextPage,protocol:2,stateUptimeMs:$stamp,requestId:$ack,error:$err,busy:$busy,current:$current,readyVideoId:$ready}|
-   .items=(.items//[]|map(.id as $id|.+{previewReady:($cached|index($id)!=null),preview:(if ($cached|index($id)!=null) then $run+$rev+"-"+$id+".jpg" else "" end),playback:(if (.kind=="video" or .kind=="audio") and .id==$ready then (if .streamable==true then $proxy+$id+"?revision="+$rev else $videoRun+$rev+"-"+$id+".mp4" end) else "" end)}))
+   .items=(.items//[]|map(.id as $id|.+{previewReady:($cached|index($id)!=null),preview:(if ($cached|index($id)!=null) then $run+$rev+"-"+$id+".jpg" else "" end),liveReady:(.live==true and ($videoIds|index($id)!=null)),playback:(if .live==true and ($videoIds|index($id)!=null) then $videoRun+$rev+"-"+$id+".mp4" elif (.kind=="video" or .kind=="audio") and .id==$ready then (if .streamable==true then $proxy+$id+"?revision="+$rev else $videoRun+$rev+"-"+$id+".mp4" end) else "" end)}))
   ' "$RUN/remote.json" > "$RUN/manifest.next"
  else
   jq -n --arg kind "$media_kind" --arg err "$error" --arg ack "$last_request" --argjson stamp "$stamp" '{mediaKind:$kind,protocol:2,stateUptimeMs:$stamp,requestId:$ack,enabled:false,items:[],current:0,busy:false,error:$err}' > "$RUN/manifest.next"
  fi
+ if [ ! -s "$RUN/manifest.next" ] || ! jq -e 'type=="object" and (.items|type)=="array"' "$RUN/manifest.next" >/dev/null 2>&1;then rm -f "$RUN/manifest.next";return 1;fi
  mv "$RUN/manifest.next" "$RUN/manifest.json"
 }
 load(){
  result=0
- get "/api/media/manifest?offset=$offset" "$RUN/remote.next" 65536 15 || result=$?
+ get "/api/media/manifest?offset=$offset&kind=$media_kind" "$RUN/remote.next" 65536 15 || result=$?
  if [ "$result" -eq 2 ];then return 2;fi
  if [ "$result" -ne 0 ] || ! jq -e 'type=="object" and (.items|type)=="array"' "$RUN/remote.next" >/dev/null 2>&1;then
   error='相册暂不可用，请检查 NAS 与网页配置';last_poll=$(up);status;return 1
  fi
- if ! jq --arg kind "$media_kind" '{enabled:(.enabled==true),revision:(.revision//""),albumName:(.albumName//"相册与视频"),intervalMs:((.intervalMs//10000)|if .<3000 then 3000 elif .>60000 then 60000 else . end),offset:(.offset//0),hasMore:(.hasMore==true),items:(.items|map(select((.id|type)=="string" and (.id|length)>0 and (.id|length)<=12 and (.id|explode|all(.[];.>=48 and .<=57)) and (.kind=="photo" or .kind=="video" or .kind=="audio") and ($kind=="all" or .kind==$kind)))|.[0:24])}' "$RUN/remote.next" > "$RUN/remote.clean";then
+ if ! jq --arg kind "$media_kind" '{total:(if .mediaKind==$kind and (.total|type)=="number" and .total>=0 and .total<=10000 then .total else null end),enabled:(.enabled==true),revision:(.revision//""),albumName:(.albumName//"相册与视频"),intervalMs:((.intervalMs//10000)|if .<3000 then 3000 elif .>60000 then 60000 else . end),offset:(.offset//0),hasMore:(.hasMore==true),items:(.items|map(select((.id|type)=="string" and (.id|length)>0 and (.id|length)<=12 and (.id|explode|all(.[];.>=48 and .<=57)) and (.kind=="photo" or .kind=="video" or .kind=="audio") and ($kind=="all" or .kind==$kind)))|.[0:24])}' "$RUN/remote.next" > "$RUN/remote.clean";then
   error='相册数据暂不可用';status;return 1
  fi
  source_page=$offset
@@ -112,7 +115,7 @@ load(){
  enabled=$(jq -r '.enabled' "$RUN/remote.clean")
  if [ "$enabled" = true ] && [ "${#next}" -ne 24 ];then error='相册版本暂不可用';status;return 1;fi
  if [ "$revision" != "$next" ];then rm -f "$RUN/cache/"*.jpg;clear_videos;ready_video='';fi
- if [ "$revision" != "$next" ];then seen='[]';fi
+ if [ "$revision" != "$next" ];then seen='[]';shuffle_left='[]';fi
  revision=$next
  mv "$RUN/remote.clean" "$RUN/remote.json"
  rm -f "$RUN/remote.next"
@@ -133,11 +136,18 @@ image(){
 prune(){
  ls -t "$RUN/cache/"*.jpg 2>/dev/null | tail -n +5 | while IFS= read -r old;do rm -f "$old";done
 }
+prepare_live(){
+ live_id=$1
+ file="$VIDEO_DIR/$revision-$live_id.mp4"
+ if [ ! -s "$file" ];then get "/api/media/item/$live_id/video?revision=$revision" "$file" 33554432 55 || return;fi
+ touch "$file"
+ ls -t "$VIDEO_DIR/$revision"-*.mp4 2>/dev/null | tail -n +3 | while IFS= read -r old;do rm -f "$old";done
+}
 fetch_selected(){
  # Photos authorizes only the last listed page. A sparse backward search may
  # restore the previous view; re-authorize it before an evicted preview is read.
  if [ "$source_page" -ne "$offset" ];then
-  get "/api/media/manifest?offset=$offset" "$RUN/authorize.json" 65536 15 || return
+  get "/api/media/manifest?offset=$offset&kind=$media_kind" "$RUN/authorize.json" 65536 15 || return
   if [ "$(jq -r '.revision' "$RUN/authorize.json")" != "$revision" ];then error='媒体选择已更新，请重试';status;return 1;fi
   source_page=$offset
  fi
@@ -154,8 +164,15 @@ fetch_selected(){
  if [ "$result" -eq 2 ];then busy=false;return 2;fi
  if [ "$result" -ne 0 ];then busy=false;error='照片预览暂不可用，请重试';status;return 1;fi
  if [ "${1:-false}" = true ];then
-  id=$(jq -r --argjson n "$selected" '.items[$n]|if .kind=="video" or .kind=="audio" then .id else "" end' "$RUN/remote.json")
+  id=$(jq -r --argjson n "$selected" '.items[$n]|if .kind=="video" or .kind=="audio" or .live==true then .id else "" end' "$RUN/remote.json")
   case "$id" in ''|*[!0-9]*) busy=false;error='当前项目不是视频';status;return 1;;esac
+  live=$(jq -r --argjson n "$selected" '.items[$n].live==true' "$RUN/remote.json")
+  if [ "$live" = true ];then
+   result=0;prepare_live "$id" || result=$?
+   if [ "$result" -eq 2 ];then busy=false;return 2;fi
+   if [ "$result" -ne 0 ];then busy=false;error='动态预览暂不可用，将保留照片';status;return 1;fi
+   ready_video=$id;busy=false;error='';status;return 0
+  fi
   streamable=$(jq -r --argjson n "$selected" '.items[$n].streamable==true' "$RUN/remote.json")
   if [ "$streamable" = true ];then ready_video=$id;busy=false;error='';status;return 0;fi
   file="$VIDEO_DIR/$revision-$id.mp4"
@@ -175,6 +192,16 @@ fetch_selected(){
 choose_next(){
  next_index=-1;next_id='';next_page=$offset
  [ "$media_kind" = photo ] || return 0
+ total=$(jq -r '.total//0' "$RUN/remote.json")
+ if [ "$total" -gt 1 ];then
+  absolute=$((offset+selected))
+  shuffle_left=$(printf '%s' "$shuffle_left" | jq -c --argjson i "$absolute" 'map(select(.!=$i))')
+  count=$(printf '%s' "$shuffle_left" | jq length)
+  if [ "$count" -eq 0 ];then shuffle_left=$(jq -cn --argjson total "$total" --argjson i "$absolute" '[range(0;$total)|select(.!=$i)]');count=$((total-1));fi
+  random=$(od -An -N4 -tu4 /dev/urandom | tr -d ' ')
+  absolute=$(printf '%s' "$shuffle_left" | jq -r --argjson n "$((random%count))" '.[$n]')
+  next_page=$((absolute/24*24));next_index=$((absolute%24));return 0
+ fi
  # Keep a shuffled bag for this page; never immediately repeat a photo.
  id=$(jq -r --argjson n "$selected" '.items[$n].id//empty' "$RUN/remote.json")
  seen=$(printf '%s' "$seen" | jq -c --arg id "$id" '.+[$id]|unique')
@@ -193,16 +220,16 @@ choose_next(){
 }
 warm_page(){
  # Prepare a randomized item on the following page without changing the view.
- warm=$next_page;steps=0
+ warm=$next_page;planned_index=$next_index;steps=0
  while [ "$steps" -lt 208 ];do
-  get "/api/media/manifest?offset=$warm" "$RUN/warm.json" 65536 15 || return
+  get "/api/media/manifest?offset=$warm&kind=$media_kind" "$RUN/warm.json" 65536 15 || return
   source_page=$warm
   [ "$(jq -r '.revision' "$RUN/warm.json")" = "$revision" ] || return
-  jq '.items=[.items[]|select(.kind=="photo" and (.id|type)=="string" and (.id|test("^[0-9]{1,12}$")))]' "$RUN/warm.json" > "$RUN/warm.clean"
+  jq '.items=[.items[]|select(.kind=="photo" and (.id|type)=="string" and (.id|length>0 and length<=12 and (explode|all(.[];.>=48 and .<=57))))]' "$RUN/warm.json" > "$RUN/warm.clean"
   count=$(jq '.items|length' "$RUN/warm.clean")
   if [ "$count" -gt 0 ];then
    random=$(od -An -N4 -tu4 /dev/urandom | tr -d ' ')
-   candidate=$((random%count))
+   candidate=$((random%count));if [ "$planned_index" -ge 0 ] && [ "$planned_index" -lt "$count" ];then candidate=$planned_index;fi
    id=$(jq -r --argjson n "$candidate" '.items[$n].id' "$RUN/warm.clean")
    file="$RUN/cache/$revision-$id.jpg"
    if [ ! -s "$file" ];then get "/api/media/item/$id/preview?revision=$revision" "$file" 4194304 15 || return;fi
@@ -217,7 +244,7 @@ prefetch(){
  count=$(jq '.items|length' "$RUN/remote.json" 2>/dev/null || echo 0)
  if [ "$media_kind" = photo ];then
   choose_next
-  if [ "$next_index" -lt 0 ] && [ "$next_page" -ne "$offset" ];then warm_page || true;fi
+  if [ "$next_page" -ne "$offset" ];then warm_page || true;fi
   if [ "$next_page" = "$offset" ] && [ "$next_index" -ge 0 ];then next_id=$(jq -r --argjson n "$next_index" '.items[$n].id' "$RUN/remote.json");fi
   if [ "$next_page" = "$offset" ];then candidates="$next_index";else candidates="";fi
  else candidates="$((selected+1)) $((selected+2))";fi
@@ -234,6 +261,10 @@ prefetch(){
   [ -z "$current_id" ] || touch "$RUN/cache/$revision-$current_id.jpg"
   prune;status
  done
+ if [ "$media_kind" = photo ] && [ -n "$next_id" ] && [ "$next_index" -ge 0 ];then
+  next_file="$RUN/remote.json";[ "$next_page" = "$offset" ] || next_file="$RUN/warm.clean"
+  if jq -e --argjson n "$next_index" '.items[$n].live==true' "$next_file" >/dev/null;then prepare_live "$next_id" || true;fi
+ fi
  # Touch the displayed image last so bounded eviction cannot remove it.
  id=$(jq -r --argjson n "$selected" '.items[$n].id//empty' "$RUN/remote.json" 2>/dev/null || true)
  [ -z "$id" ] || touch "$RUN/cache/$revision-$id.jpg"
@@ -251,7 +282,7 @@ while :;do
    requested_kind=$(jq -r '.kind//"all"|select(.=="all" or .=="photo" or .=="video" or .=="audio")' "$RUN/request.snapshot")
    [ -n "$requested_kind" ] || continue
    kind_changed=false
-   if [ "$media_kind" != "$requested_kind" ];then media_kind=$requested_kind;kind_changed=true;has_previous=true;seen='[]';next_index=-1;fi
+   if [ "$media_kind" != "$requested_kind" ];then media_kind=$requested_kind;kind_changed=true;has_previous=true;seen='[]';shuffle_left='[]';next_index=-1;fi
    stamp=$(printf '%s' "$row" | cut -f2);page=$(printf '%s' "$row" | cut -f3);index=$(printf '%s' "$row" | cut -f4);video=$(printf '%s' "$row" | cut -f5);force=$(printf '%s' "$row" | cut -f6)
    now=$(up);age=$((now-stamp))
    if [ "$age" -ge 0 ] && [ "$age" -le 7 ] && [ "$page" -ge 0 ] && [ "$page" -le 100000 ] && [ $((page%24)) -eq 0 ] && [ "$index" -ge 0 ] && [ "$index" -lt 24 ];then

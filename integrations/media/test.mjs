@@ -51,3 +51,44 @@ test('TLS gateway authentication, scope and browser origin',async()=>{
   assert.equal(await request('/api/media/browse','a'.repeat(64),'POST','https://10.0.0.1:6080',{}),200);
  }finally{await new Promise(r=>server.close(r));fs.rmSync(tmp,{recursive:true,force:true});}
 });
+
+import {appleStillIdentifier,quickTimeIdentifier,pairingIdentifier} from './dist/live-photo.js';
+const asset='11111111-2222-4333-8444-555555555555';
+function still(identifier=asset){const b=Buffer.alloc(96);b.write('Apple iOS\0');b.writeUInt16BE(1,10);b.write('MM',12);b.writeUInt16BE(1,14);b.writeUInt16BE(17,16);b.writeUInt16BE(2,18);b.writeUInt32BE(37,20);b.writeUInt32BE(32,24);b.write(identifier+'\0',32);return b;}
+function atom(type,...data){let b=Buffer.concat(data),h=Buffer.alloc(8);h.writeUInt32BE(b.length+8);typeof type==='number'?h.writeUInt32BE(type,4):h.write(type,4);return Buffer.concat([h,b]);}
+function movie(identifier=asset,fullBox=true){const n=Buffer.alloc(8);n.writeUInt32BE(1,4);const data=Buffer.alloc(8);data.writeUInt32BE(1);return Buffer.concat([atom('ftyp',Buffer.from('qt  ')),atom('moov',atom('meta',fullBox?Buffer.alloc(4):Buffer.alloc(0),atom('keys',n,atom('mdta',Buffer.from('com.apple.quicktime.content.identifier'))),atom('ilst',atom(1,atom('data',data,Buffer.from(identifier))))))]);}
+test('bounded Live Photo pairing reads matching identifiers, rejects malformed metadata',()=>{
+ assert.equal(appleStillIdentifier(still()),asset);assert.equal(quickTimeIdentifier(movie()),asset);assert.equal(quickTimeIdentifier(movie(asset,false)),asset);
+ for(let n=0;n<still().length;n++)assert.doesNotThrow(()=>appleStillIdentifier(still().subarray(0,n)));
+ const malformed=still();malformed.writeUInt32BE(0xffffffff,24);assert.equal(appleStillIdentifier(malformed),'');
+ const wrong=movie().subarray(0,25);assert.equal(quickTimeIdentifier(wrong),'');assert.equal(appleStillIdentifier(Buffer.from(asset)),'');
+});
+test('typed pages skip photo scans in UI, Live pairing remains selected-only and stale-safe',async()=>{
+ const tmp=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'cgs2-live-test-'))),root=path.join(tmp,'media');fs.mkdirSync(root);
+ const matching=path.join(root,'a.jpg'),matchedMovie=path.join(root,'a.MOV'),unmatched=path.join(root,'b.jpg');fs.writeFileSync(matching,still());fs.writeFileSync(matchedMovie,movie());fs.writeFileSync(unmatched,still());fs.writeFileSync(path.join(root,'b.MOV'),movie('aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'));
+ const outside=path.join(tmp,'outside.MOV');fs.writeFileSync(outside,movie());fs.writeFileSync(path.join(root,'c.jpg'),still());fs.symlinkSync(outside,path.join(root,'c.MOV'));
+ for(let i=0;i<50;i++)fs.writeFileSync(path.join(root,'plain-'+i+'.jpg'),Buffer.from('not-live'));
+ const video=path.join(root,'selected.mp4'),audio=path.join(root,'selected.mp3');fs.writeFileSync(video,movie());fs.writeFileSync(audio,'audio');
+ const media=new NasMedia(path.join(tmp,'settings.json'),{roots:[{path:root,label:'Media'}],placeholder:Buffer.alloc(1)});
+ media.configure({source:'nas',enabled:true,deviceId:'cgs2',intervalMs:3000,folder:key(root),files:[key(video),key(audio)],recursive:true},['cgs2']);
+ try{
+  assert.equal((await media.manifest('cgs2',0,'video')).items.length,1);assert.equal((await media.manifest('cgs2',0,'audio')).items[0].kind,'audio');
+  const photos=await media.manifest('cgs2',0,'photo');assert.equal(photos.total,53);assert(photos.items.every(i=>i.kind==='photo'));assert.equal(photos.items.find(i=>i.title==='a.jpg').live,true);assert.equal(photos.items.find(i=>i.title==='b.jpg').live,false);assert.equal(photos.items.find(i=>i.title==='c.jpg').live,false);
+  assert.equal(pairingIdentifier(matching),asset);assert.equal(pairingIdentifier(matchedMovie,true),asset);assert(!JSON.stringify(photos).includes(asset));assert(!JSON.stringify(photos).includes(tmp));
+  await assert.rejects(media.manifest('cgs2',0,'wrong'));
+  fs.writeFileSync(matchedMovie,movie('aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'));
+  const item=photos.items.find(i=>i.title==='a.jpg');await assert.rejects(media.stream('cgs2',item.id,photos.revision,{headers:{}},{writeHead(){},end(){}}));
+ }finally{media.close();fs.rmSync(tmp,{recursive:true,force:true});}
+});
+
+import {LiveCache} from './dist/live-cache.js';
+test('compatibility clips share bounded work, retain a cache, cancel on settings change',async()=>{
+ const tmp=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'cgs2-clip-test-'))),source=path.join(tmp,'source.mov'),tool=path.join(tmp,'ffmpeg');fs.writeFileSync(source,movie());
+ const output=path.join(tmp,'sample.mp4');fs.writeFileSync(output,movie());
+ fs.writeFileSync(tool,'#!/bin/sh\nfor last;do :;done\n/bin/cp '+JSON.stringify(output)+' "$last"\n',{mode:0o700});
+ const cache=new LiveCache(path.join(tmp,'cache'),()=>tool);
+ try{
+  const file=await cache.prepare(source,'one');assert(fs.existsSync(file));assert.equal(await cache.prepare(source,'one'),file);assert.equal(fs.statSync(file).mode&0o777,0o600);
+  fs.writeFileSync(tool,'#!/bin/sh\nexec sleep 10\n',{mode:0o700});const pending=cache.prepare(source,'two');await assert.rejects(cache.prepare(source,'three'));cache.close();await assert.rejects(pending);
+ }finally{cache.close();fs.rmSync(tmp,{recursive:true,force:true});}
+});

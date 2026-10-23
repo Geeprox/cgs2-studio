@@ -21,3 +21,7 @@ same(c.target(shuffled,0,1,true),{page:0,index:17});
 same(c.target({...shuffled,nextPreview:''},0,1,true),null);
 assert.equal(c.nextPreview(shuffled,0),shuffled.nextPreview);
 same(c.target({...page,offset:24,hasPrevious:false},0,-1,false),null);
+
+// A paired Live Photo can play its published local compatibility clip.
+assert.equal(c.readyVideo({readyVideoId:''},{id:'7',kind:'photo',live:true,liveReady:true,playback:'file:///userdata/cgs2-ui/cache/media/clip.mp4'}),true);
+assert.equal(c.readyVideo({readyVideoId:''},{id:'7',kind:'photo',live:true,liveReady:true,playback:'https://example.com/motion.mov'}),false);

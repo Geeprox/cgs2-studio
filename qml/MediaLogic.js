@@ -22,7 +22,7 @@ function accept(value,requestId,lastStamp){
 }
 function selected(media,current){return media&&media.items&&current>=0&&current<media.items.length?media.items[current]:null}
 function readyPhoto(item){return !!item&&item.previewReady===true&&typeof item.preview==='string'&&item.preview.indexOf('file:///tmp/cgs2-media/cache/')===0}
-function readyVideo(media,item){return !!item&&(item.kind==='video'||item.kind==='audio')&&String(media.readyVideoId)===String(item.id)&&typeof item.playback==='string'&&(item.playback.indexOf('file:///userdata/cgs2-ui/cache/media/')===0||/^http:\/\/127\.0\.0\.1:6097\/media\/[0-9]{1,12}\?revision=[a-f0-9]{24}$/.test(item.playback))}
+function readyVideo(media,item){return !!item&&(item.kind==='video'||item.kind==='audio'||item.live===true)&&(String(media.readyVideoId)===String(item.id)||item.live===true&&item.liveReady===true)&&typeof item.playback==='string'&&(item.playback.indexOf('file:///userdata/cgs2-ui/cache/media/')===0||/^http:\/\/127\.0\.0\.1:6097\/media\/[0-9]{1,12}\?revision=[a-f0-9]{24}$/.test(item.playback))}
 
 // Only warm a published, local preview; the client publishes after atomic rename.
 function nextPreview(media,current){

@@ -2,9 +2,9 @@
 
 Codex Micro 把 CGS2 的触摸屏变成一个桌面控制面板：六枚任务键、方向摇杆、推理强度旋钮，以及可映射的快捷操作。它与表盘共用一个主菜单入口，离开面板后释放遥控状态。
 
-<img src="previews/micro.png" width="480" alt="Codex Micro 示例界面：六枚任务状态键、旋钮、方向摇杆与快捷操作键">
+<img src="previews/micro.png" width="480" alt="Codex Micro 实机屏幕截图：当前配置的快捷键、旋钮和方向摇杆">
 
-配图由实际 QML 在设备 Qt 环境离屏渲染，使用虚构任务状态；不表示已经连接某个真实任务。
+配图直接截自运行中的 CGS2 屏幕，保留当前配置的应用和快捷键图标；没有重绘界面或模拟任务状态。不同使用者的键位映射和图标可以不同。
 
 ## 操作与反馈
 
@@ -21,3 +21,13 @@ Codex Micro 把 CGS2 的触摸屏变成一个桌面控制面板：六枚任务�
 本仓库包含 `qml/MicroPanel.qml`、手势和按键组件、`device/micro-client.sh` 及启动入口。**不包含 ARL / Codex 桌面控制适配器，也不提供一个通用、开箱即用的 Codex 官方远控 API。** 基础安装不会创建虚假在线状态，也不会覆盖已有的 Micro 配对。已有兼容部署可继续使用；独立 NAS 媒体服务仅提供媒体功能。
 
 设备的传感器、表盘和本地历史不依赖 Micro 服务。
+
+## 截取实际屏幕
+
+在设备打开需要记录的页面，然后运行：
+
+```sh
+python3 tools/capture_screen.py --output .local/screens/micro.png
+```
+
+该工具只读当前 DRM 扫描缓冲区，不重启界面、不重新渲染，不改变屏幕尺寸。先检查截图中的任务名称、应用图标与其他个人信息，再决定是否分享。`tools/preview_device.py` 仍用于固定示例数据的表盘预览。

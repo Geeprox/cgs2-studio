@@ -46,13 +46,13 @@ export class PhotosMedia{
   return this.context={sharing,phrase,expires:Date.now()+5*60000};
  }
  private async api(api:string,version:number,method:string,args:Record<string,unknown>){const ctx=await this.session();const d=JSON.parse((await this.request('/mo/sharing/webapi/entry.cgi',{api,version,method,_sharing_id:ctx.sharing,passphrase:ctx.phrase,...args})).toString());if(!d.success){this.context=undefined;throw Error('Photos 拒绝访问，请检查共享链接');}return d.data;}
- async manifest(id:string,offset:number){
+ async manifest(id:string,offset:number,kind='all'){
   if(!this.allowed(id))return {enabled:false,items:[],albumName:'未选择相册'};
-  if(!Number.isInteger(offset)||offset<0||offset>100000)throw Error('Invalid offset');
-  const revision=this.value.revision,d=await this.api('SYNO.Foto.Browse.Item',7,'list',{offset,limit:25,sort_by:'takentime',sort_direction:'asc',additional:['thumbnail','video_convert','video_meta']});
+  if(!['all','photo','video','audio'].includes(kind)||!Number.isInteger(offset)||offset<0||offset>100000)throw Error('Invalid offset');
+  const revision=this.value.revision,d=await this.api('SYNO.Foto.Browse.Item',7,'list',{offset,limit:25,sort_by:'takentime',sort_direction:'asc',...(kind==='video'?{type:'video'}:{}),additional:['thumbnail','video_convert','video_meta']});
   if(revision!==this.value.revision)throw Error('Media settings changed');
-  const raw=Array.isArray(d.list)?d.list.slice(0,25):[];const list=raw.slice(0,24).filter((p:Photo)=>Number.isSafeInteger(p.id)&&['photo','video'].includes(p.type)).slice(0,24);this.items.clear();for(const p of list)this.items.set(p.id,p);
-  return {enabled:true,revision,albumName:'Synology Photos',intervalMs:this.value.intervalMs,offset,hasMore:raw.length>24,items:list.map((p:Photo)=>({id:String(p.id),kind:p.type==='video'?'video':'photo',preview:'/api/media/item/'+p.id+'/preview?revision='+revision,playback:p.type==='video'?'/api/media/item/'+p.id+'/video?revision='+revision:undefined}))};
+  const raw=Array.isArray(d.list)?d.list.slice(0,25):[];const list=raw.slice(0,24).filter((p:Photo)=>Number.isSafeInteger(p.id)&&['photo','video','live'].includes(p.type)&& (kind==='all'||kind==='photo'&&p.type!=='video'||kind==='video'&&p.type==='video')).slice(0,24);this.items.clear();for(const p of list)this.items.set(p.id,p);
+  return {enabled:true,mediaKind:kind,revision,albumName:'Synology Photos',intervalMs:this.value.intervalMs,offset,hasMore:raw.length>24,items:list.map((p:Photo)=>({id:String(p.id),kind:p.type==='video'?'video':'photo',live:p.type==='live',preview:'/api/media/item/'+p.id+'/preview?revision='+revision,playback:p.type==='video'?'/api/media/item/'+p.id+'/video?revision='+revision:undefined}))};
  }
  async bytes(id:string,itemId:number,revision:string,kind:'preview'|'video'){
   if(!this.allowed(id)||revision!==this.value.revision||!this.items.has(itemId))throw Error('Media access expired');
@@ -65,7 +65,7 @@ export class PhotosMedia{
     b=await this.request('/synofoto/api/v2/p/Thumbnail/get?'+new URLSearchParams(Object.entries(p).map(([k,v])=>[k,JSON.stringify(v)])).toString(),undefined,4*1024*1024);
     if(b[0]!==0xff||b[1]!==0xd8)throw Error('JPEG preview unavailable');if(!this.allowed(id)||revision!==this.value.revision)throw Error('Media settings changed');return {body:b,type:'image/jpeg'};
    }
-   if(item.type!=='video')throw Error('Not a video');
+   if(item.type!=='video'&&item.type!=='live')throw Error('Not a video');
    const variants=Array.isArray(item.additional?.video_convert)?item.additional!.video_convert!:[];
    const converted=variants.filter(v=>v.metadata?.video_codec==='h264').sort((a,b)=>(a.metadata?.frame_bitrate||0)-(b.metadata?.frame_bitrate||0))[0];
    if(!converted||!['high','medium','low'].includes(converted.quality)||(converted.metadata?.duration||0)*(converted.metadata?.frame_bitrate||0)/8000>64*1024*1024)throw Error('请在 NAS 生成 64 MB 以内的 H.264 兼容预览');

@@ -10,8 +10,13 @@
   into Display & Connection.
 - Shuffle photo batches without immediate repeats and prefetch the chosen next
   image, including across sparse pages. Preserve the current image while waiting.
-- Document Codex Micro with a synthetic Qt-rendered illustration and explicit
-  integration boundaries; clarify current Live Photo limitations.
+- Replace the Micro illustration with a direct capture of the real device,
+  preserving its configured shortcut icons.
+- Pair Live Photos by embedded content identifiers, prepare bounded H.264/AAC
+  clips on the NAS, and advance the slideshow after playback ends.
+- Default video and Live Photo playback to muted, with an explicit sound toggle.
+- Filter media by kind before pagination so a video selected alongside thousands
+  of photos is immediately available; shuffle folder photos across all pages.
 - Add real shell-worker regressions for typed media, shuffle bags, cross-page
   prefetch and empty categories, plus isolated Qt media/panel previews.
 
