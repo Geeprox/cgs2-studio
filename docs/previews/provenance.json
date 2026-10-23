@@ -1,0 +1,20 @@
+{
+  "source": "Current QML rendered by tools/preview_device.py using fixed synthetic sensor/context data; Qt 5.14.2 offscreen/software. Resized to 480px with sips. No real readings, microphone, personal media or provider configuration. EXIF and text metadata removed without changing pixel data.",
+  "date": "2026-10-24",
+  "files": {
+    "face-0.png": "d7175503c962c229f712119fc0988dfa1f6eb0b30e09ce9246f7c4302d66e888",
+    "face-1.png": "6216f48a15d6acfd94d2ec521d52e2114e77f5a7b89bb75d9daacad8eb84c784",
+    "face-10.png": "1b53d4fa83774c3fb361457babf669c313e551157174386eb23d4b5e65e0d9d5",
+    "face-11.png": "31f369ff78bd72f1b27c8850c5c5cef41af40978de9eb49117c7a245260eb126",
+    "face-12.png": "e22aeee4c763ff01c231e2a23ea0c586d834bddf61e743a124172ecca83e5bf7",
+    "face-13.png": "4f41475763a8c29e0230abfd854dc41481c8c5caac8876af2adb3181a44aa0b2",
+    "face-2.png": "3d50bebb8524d0fbf3240912863967a8cc19635912c95c6e9687c11d548e79ca",
+    "face-3.png": "0dcdf9b5431ba7920e8719fe66bcb95c4336738b264b994740bf7566130cd1fc",
+    "face-4.png": "646e1fef049446bd97aa3d23f296274f2f7cf205f1c4ed17fb601707294ae261",
+    "face-5.png": "7fa3cbfdecf6e40fdc32e4bb16a54938b8e60048adf9a601526829733627b75f",
+    "face-6.png": "bfff0329bc8774760f02fc4f00a72e114bc395d2cd44ee5c0294c735a88309af",
+    "face-7.png": "b9d99a4354a2336aa8f64b0ee7fba07ca79ca9ebbe3d9f8f20a921488d6bb92c",
+    "face-8.png": "07d3adf025b2569b81b172bd14f128ada29864ba876f1078c82e069585ca70be",
+    "face-9.png": "1efa330486017cd710aaa40b10260e312fc14a4e72ecf281d45851c6568efdef"
+  }
+}
